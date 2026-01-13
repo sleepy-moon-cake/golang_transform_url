@@ -7,7 +7,7 @@ import (
 
 var urlStorage = make(map[string]string)
 
-func CreateShortUrl(str string) string {
+func CreateshortURL(str string) string {
 	key := generateKey()
 
 	urlStorage[key] = str
@@ -18,7 +18,7 @@ func CreateShortUrl(str string) string {
 func GetUrlByCode(code string) (string, error) {
 	v, ok := urlStorage[code]
 	if !ok {
-		return "", errors.New("No data")
+		return "", errors.New("no data")
 	}
 	return v, nil
 }

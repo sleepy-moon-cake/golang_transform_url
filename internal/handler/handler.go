@@ -17,12 +17,12 @@ func ListenAndServe(cng *config.Config) error {
 func createHandler() *http.ServeMux {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("GET /{shortUrl}", getShortUrl)
-	mux.HandleFunc("POST /", createShortUrl)
+	mux.HandleFunc("GET /{shortURL}", getshortURL)
+	mux.HandleFunc("POST /", CreateshortURL)
 	return mux
 }
 
-func createShortUrl(w http.ResponseWriter, r *http.Request) {
+func CreateshortURL(w http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("Content-Type") != "text/plain" {
 		http.Error(w, "", http.StatusBadRequest)
 		return
@@ -34,14 +34,14 @@ func createShortUrl(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortUrl := service.CreateShortUrl(string(body))
+	shortURL := service.CreateshortURL("http://localhost:8080/" + string(body))
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte(shortUrl))
+	w.Write([]byte(shortURL))
 }
 
-func getShortUrl(w http.ResponseWriter, r *http.Request) {
+func getshortURL(w http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("Content-Type") != "text/plain" {
 		http.Error(w, "", http.StatusBadRequest)
 		return
@@ -52,15 +52,15 @@ func getShortUrl(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortUrl := strings.TrimPrefix(r.URL.Path, "/")
+	shortURL := strings.TrimPrefix(r.URL.Path, "/")
 
-	originalUrl, err := service.GetUrlByCode(shortUrl)
+	originalUrl, err := service.GetUrlByCode(shortURL)
 
 	if err != nil {
 		http.Error(w, "", http.StatusBadRequest)
 		return
 	}
 
-	w.Header().Add("Location", originalUrl)
+	w.Header().Add("Location", "http://localhost:8080/"+originalUrl)
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
