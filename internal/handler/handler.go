@@ -51,13 +51,13 @@ func getshortURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	shortURL := strings.TrimPrefix(r.URL.Path, "/")
-	originalUrl, err := service.GetUrlByCode(shortURL)
+	originalURL, err := service.GetURLByCode(shortURL)
 
 	if err != nil {
 		http.Error(w, "", http.StatusBadRequest)
 		return
 	}
 
-	w.Header().Add("Location", originalUrl)
+	w.Header().Add("Location", originalURL)
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }

@@ -15,7 +15,7 @@ func CreateshortURL(str string) string {
 	return key
 }
 
-func GetUrlByCode(code string) (string, error) {
+func GetURLByCode(code string) (string, error) {
 	v, ok := urlStorage[code]
 	if !ok {
 		return "", errors.New("no data")
