@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -34,7 +35,8 @@ func CreateshortURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortURL := service.CreateshortURL("http://localhost:8080/" + string(body))
+	id := service.CreateshortURL(string(body))
+	shortURL := fmt.Sprintf("http://localhost:8080/%s", id)
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
@@ -42,10 +44,6 @@ func CreateshortURL(w http.ResponseWriter, r *http.Request) {
 }
 
 func getshortURL(w http.ResponseWriter, r *http.Request) {
-	if r.Header.Get("Content-Type") != "text/plain" {
-		http.Error(w, "", http.StatusBadRequest)
-		return
-	}
 
 	if r.URL.Path == "/" {
 		http.Error(w, "", http.StatusBadRequest)
@@ -53,7 +51,6 @@ func getshortURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	shortURL := strings.TrimPrefix(r.URL.Path, "/")
-
 	originalUrl, err := service.GetUrlByCode(shortURL)
 
 	if err != nil {
@@ -61,6 +58,6 @@ func getshortURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Add("Location", "http://localhost:8080/"+originalUrl)
+	w.Header().Add("Location", originalUrl)
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
