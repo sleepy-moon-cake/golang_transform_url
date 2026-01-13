@@ -5,18 +5,21 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/sleepy-moon-cake/golang_transform_url/internal/config"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/service"
 )
 
-func Url(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodPost:
-		createShortUrl(w, r)
-	case http.MethodGet:
-		getShortUrl(w, r)
-	default:
-		http.Error(w, "method not allowed", http.StatusBadRequest)
-	}
+func ListenAndServe(cng *config.Config) error {
+	handler := createHandler()
+	return http.ListenAndServe(cng.ServerAddress, handler)
+}
+
+func createHandler() *http.ServeMux {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("GET /{shortUrl}", getShortUrl)
+	mux.HandleFunc("POST /", createShortUrl)
+	return mux
 }
 
 func createShortUrl(w http.ResponseWriter, r *http.Request) {
