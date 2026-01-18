@@ -19,12 +19,12 @@ func createHandler() *http.ServeMux {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /{shortURL}", getshortURL)
-	mux.HandleFunc("POST /", CreateshortURL)
+	mux.HandleFunc("POST /", createshortURL)
 	return mux
 }
 
-func CreateshortURL(w http.ResponseWriter, r *http.Request) {
-	if r.Header.Get("Content-Type") != "text/plain" {
+func createshortURL(w http.ResponseWriter, r *http.Request) {
+	if !strings.HasPrefix(r.Header.Get("Content-Type"), "text/plain") {
 		http.Error(w, "", http.StatusBadRequest)
 		return
 	}
@@ -37,14 +37,12 @@ func CreateshortURL(w http.ResponseWriter, r *http.Request) {
 
 	id := service.CreateshortURL(string(body))
 	shortURL := fmt.Sprintf("http://localhost:8080/%s", id)
-
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte(shortURL))
 }
 
 func getshortURL(w http.ResponseWriter, r *http.Request) {
-
 	if r.URL.Path == "/" {
 		http.Error(w, "", http.StatusBadRequest)
 		return
