@@ -12,12 +12,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const domainUrl = "http://localhost:8080"
-const longUrl = "https://practicum.yandex.ru/"
+const domainURL = "http://localhost:8080"
+const longURL = "https://practicum.yandex.ru/"
 
 func TestCreateshortURL(t *testing.T) {
 	t.Run("Create url", func(t *testing.T) {
-		request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(longUrl))
+		request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(longURL))
 		request.Header.Set("Content-Type", "text/plain")
 
 		w := httptest.NewRecorder()
@@ -31,7 +31,7 @@ func TestCreateshortURL(t *testing.T) {
 		resBody, err := io.ReadAll(result.Body)
 		require.NoError(t, err)
 		require.NotEmpty(t, resBody)
-		assert.Contains(t, string(resBody), domainUrl)
+		assert.Contains(t, string(resBody), domainURL)
 		assert.Contains(t, "text/plain", result.Header.Get("Content-Type"))
 	})
 }
@@ -57,7 +57,7 @@ func TestGetshortURL(t *testing.T) {
 		{
 			name: "get short url - positive",
 			setup: func() string {
-				return service.CreateshortURL(longUrl)
+				return service.CreateshortURL(longURL)
 			},
 			wantStatus: http.StatusTemporaryRedirect,
 		},
@@ -82,7 +82,7 @@ func TestGetshortURL(t *testing.T) {
 			if tt.wantStatus == http.StatusTemporaryRedirect {
 				location := res.Header.Get("Location")
 				assert.NotEmpty(t, location)
-				assert.Contains(t, location, longUrl)
+				assert.Contains(t, location, longURL)
 			}
 		})
 	}
