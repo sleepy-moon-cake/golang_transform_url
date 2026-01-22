@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -46,7 +45,7 @@ func (h URLHandle) createshortURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id := service.CreateshortURL(string(body))
-	shortURL := fmt.Sprintf("http://localhost:8080/%s", id)
+	shortURL := h.baseURL + id
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte(shortURL))
