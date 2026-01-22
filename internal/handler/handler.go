@@ -12,22 +12,28 @@ import (
 )
 
 func ListenAndServe(cng *config.Config) error {
-	router := createRouter()
+	handler := UrlHandle{baseUrl: cng.BaseUrlAddress}
+
+	router := createRouter(&handler)
 
 	return http.ListenAndServe(cng.ServerAddress, router)
 }
 
-func createRouter() http.Handler {
+func createRouter(handler *UrlHandle) http.Handler {
 	r := chi.NewRouter()
 
 	r.Route("/", func(r chi.Router) {
-		r.Get("/{shortURL}", getshortURL)
-		r.Post("/", createshortURL)
+		r.Get("/{shortURL}", handler.getshortURL)
+		r.Post("/", handler.createshortURL)
 	})
 	return r
 }
 
-func createshortURL(w http.ResponseWriter, r *http.Request) {
+type UrlHandle struct {
+	baseUrl string
+}
+
+func (h UrlHandle) createshortURL(w http.ResponseWriter, r *http.Request) {
 	if !strings.HasPrefix(r.Header.Get("Content-Type"), "text/plain") {
 		http.Error(w, "", http.StatusBadRequest)
 		return
@@ -46,7 +52,7 @@ func createshortURL(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(shortURL))
 }
 
-func getshortURL(w http.ResponseWriter, r *http.Request) {
+func (h UrlHandle) getshortURL(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/" {
 		http.Error(w, "", http.StatusBadRequest)
 		return

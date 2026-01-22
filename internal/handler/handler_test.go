@@ -15,14 +15,16 @@ import (
 const domainURL = "http://localhost:8080"
 const longURL = "https://practicum.yandex.ru/"
 
-func TestCreateshortURL(t *testing.T) {
+func TestUrlHandle_CreateshortURL(t *testing.T) {
+	h := UrlHandle{baseUrl: domainURL}
+
 	t.Run("Create url", func(t *testing.T) {
 		request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(longURL))
 		request.Header.Set("Content-Type", "text/plain")
 
 		w := httptest.NewRecorder()
 
-		createshortURL(w, request)
+		h.createshortURL(w, request)
 
 		result := w.Result()
 		defer result.Body.Close()
@@ -32,11 +34,13 @@ func TestCreateshortURL(t *testing.T) {
 		require.NoError(t, err)
 		require.NotEmpty(t, resBody)
 		assert.Contains(t, string(resBody), domainURL)
-		assert.Contains(t, "text/plain", result.Header.Get("Content-Type"))
+		assert.Contains(t, result.Header.Get("Content-Type"), "text/plain")
 	})
 }
 
-func TestGetshortURL(t *testing.T) {
+func TestUrlHandle_GetshortURL(t *testing.T) {
+	h := UrlHandle{baseUrl: domainURL}
+
 	tests := []struct {
 		name       string
 		setup      func() string
@@ -72,7 +76,8 @@ func TestGetshortURL(t *testing.T) {
 
 			req := httptest.NewRequest(http.MethodGet, "/"+shortID, nil)
 			w := httptest.NewRecorder()
-			getshortURL(w, req)
+
+			h.getshortURL(w, req)
 
 			res := w.Result()
 			defer res.Body.Close()
