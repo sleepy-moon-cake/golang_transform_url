@@ -6,21 +6,25 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/config"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/service"
 )
 
 func ListenAndServe(cng *config.Config) error {
-	handler := createHandler()
-	return http.ListenAndServe(cng.ServerAddress, handler)
+	router := createRouter()
+
+	return http.ListenAndServe(cng.ServerAddress, router)
 }
 
-func createHandler() *http.ServeMux {
-	mux := http.NewServeMux()
+func createRouter() http.Handler {
+	r := chi.NewRouter()
 
-	mux.HandleFunc("GET /{shortURL}", getshortURL)
-	mux.HandleFunc("POST /", createshortURL)
-	return mux
+	r.Route("/", func(r chi.Router) {
+		r.Get("/{shortURL}", getshortURL)
+		r.Post("/", createshortURL)
+	})
+	return r
 }
 
 func createshortURL(w http.ResponseWriter, r *http.Request) {
