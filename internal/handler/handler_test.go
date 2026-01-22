@@ -16,7 +16,7 @@ const domainURL = "http://localhost:8080"
 const longURL = "https://practicum.yandex.ru/"
 
 func TestUrlHandle_CreateshortURL(t *testing.T) {
-	h := UrlHandle{baseUrl: domainURL}
+	h := URLHandle{baseURL: domainURL}
 
 	t.Run("Create url", func(t *testing.T) {
 		request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(longURL))
@@ -39,7 +39,7 @@ func TestUrlHandle_CreateshortURL(t *testing.T) {
 }
 
 func TestUrlHandle_GetshortURL(t *testing.T) {
-	h := UrlHandle{baseUrl: domainURL}
+	h := URLHandle{baseURL: domainURL}
 
 	tests := []struct {
 		name       string
