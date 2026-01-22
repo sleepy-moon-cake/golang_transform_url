@@ -7,19 +7,19 @@ import (
 
 type Config struct {
 	ServerAddress  string
-	BaseUrlAddress string
+	BaseURLAddress string
 }
 
 func GetConfig() *Config {
 	var config Config
 
 	flag.StringVar(&config.ServerAddress, "a", "localhost:8080", "server address")
-	flag.StringVar(&config.BaseUrlAddress, "b", "http://localhost:8000", "base shorted URL")
+	flag.StringVar(&config.BaseURLAddress, "b", "http://localhost:8000", "base shorted URL")
 
 	flag.Parse()
 
-	fmt.Println("Server address:", config.BaseUrlAddress)
-	fmt.Println("Base short url:", config.ServerAddress)
+	fmt.Println("Server address:", config.BaseURLAddress)
+	fmt.Println("Base short URL:", config.ServerAddress)
 
 	return &config
 }

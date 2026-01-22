@@ -12,7 +12,7 @@ import (
 )
 
 func ListenAndServe(cng *config.Config) error {
-	handler := URLHandle{baseURL: cng.BaseUrlAddress}
+	handler := URLHandle{baseURL: cng.BaseURLAddress}
 
 	router := createRouter(&handler)
 

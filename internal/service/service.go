@@ -5,18 +5,18 @@ import (
 	"math/rand"
 )
 
-var urlStorage = make(map[string]string)
+var URLStorage = make(map[string]string)
 
 func CreateshortURL(str string) string {
 	key := generateKey()
 
-	urlStorage[key] = str
+	URLStorage[key] = str
 
 	return key
 }
 
 func GetURLByCode(code string) (string, error) {
-	v, ok := urlStorage[code]
+	v, ok := URLStorage[code]
 	if !ok {
 		return "", errors.New("no data")
 	}
