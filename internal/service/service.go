@@ -1,34 +1,47 @@
 package service
 
 import (
+	"crypto/rand"
 	"errors"
-	"math/rand"
+	"math/big"
+	"sync"
 )
 
-var URLStorage = make(map[string]string)
+var URLStorage sync.Map
 
-func CreateshortURL(str string) string {
-	key := generateKey()
+func CreateShortURL(str string) string {
+	key, err := generateKey()
+	if err != nil {
+		panic(err)
+	}
 
-	URLStorage[key] = str
+	URLStorage.Store(key, str)
 
 	return key
 }
 
 func GetURLByCode(code string) (string, error) {
-	v, ok := URLStorage[code]
+	v, ok := URLStorage.Load(code)
 	if !ok {
 		return "", errors.New("no data")
 	}
-	return v, nil
+
+	return v.(string), nil
 }
 
-func generateKey() string {
-	values := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	b := make([]byte, 10)
+func generateKey() (string, error) {
+	const values = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	const length = 10
 
-	for i := range b {
-		b[i] = values[rand.Intn(len((values)))]
+	b := make([]byte, length)
+
+	for i := 0; i < length; i++ {
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(values))))
+		if err != nil {
+			return "", err
+		}
+		b[i] = values[n.Int64()]
 	}
-	return string(b)
+
+	return string(b), nil
 }

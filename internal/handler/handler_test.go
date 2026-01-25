@@ -24,7 +24,7 @@ func TestUrlHandle_CreateshortURL(t *testing.T) {
 
 		w := httptest.NewRecorder()
 
-		h.createshortURL(w, request)
+		h.createShortURL(w, request)
 
 		result := w.Result()
 		defer result.Body.Close()
@@ -61,7 +61,7 @@ func TestUrlHandle_GetshortURL(t *testing.T) {
 		{
 			name: "get short url - positive",
 			setup: func() string {
-				return service.CreateshortURL(longURL)
+				return service.CreateShortURL(longURL)
 			},
 			wantStatus: http.StatusTemporaryRedirect,
 		},
@@ -77,7 +77,7 @@ func TestUrlHandle_GetshortURL(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/"+shortID, nil)
 			w := httptest.NewRecorder()
 
-			h.getshortURL(w, req)
+			h.getShortURL(w, req)
 
 			res := w.Result()
 			defer res.Body.Close()

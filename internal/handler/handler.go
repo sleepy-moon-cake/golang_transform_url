@@ -23,8 +23,8 @@ func createRouter(handler *URLHandle) http.Handler {
 	r := chi.NewRouter()
 
 	r.Route("/", func(r chi.Router) {
-		r.Get("/{shortURL}", handler.getshortURL)
-		r.Post("/", handler.createshortURL)
+		r.Get("/{shortURL}", handler.getShortURL)
+		r.Post("/", handler.createShortURL)
 	})
 	return r
 }
@@ -33,7 +33,7 @@ type URLHandle struct {
 	baseURL string
 }
 
-func (h URLHandle) createshortURL(w http.ResponseWriter, r *http.Request) {
+func (h URLHandle) createShortURL(w http.ResponseWriter, r *http.Request) {
 	if !strings.HasPrefix(r.Header.Get("Content-Type"), "text/plain") {
 		http.Error(w, "", http.StatusBadRequest)
 		return
@@ -45,14 +45,14 @@ func (h URLHandle) createshortURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := service.CreateshortURL(string(body))
+	id := service.CreateShortURL(string(body))
 	shortURL := fmt.Sprintf("%s/%s", h.baseURL, id)
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte(shortURL))
 }
 
-func (h URLHandle) getshortURL(w http.ResponseWriter, r *http.Request) {
+func (h URLHandle) getShortURL(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/" {
 		http.Error(w, "", http.StatusBadRequest)
 		return
