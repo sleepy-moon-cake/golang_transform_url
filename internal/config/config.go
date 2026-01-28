@@ -3,6 +3,7 @@ package config
 import (
 	"flag"
 	"fmt"
+	"os"
 )
 
 type Config struct {
@@ -17,6 +18,14 @@ func GetConfig() *Config {
 	flag.StringVar(&config.BaseURLAddress, "b", "http://localhost:8080", "base shorted URL")
 
 	flag.Parse()
+
+	if evnServerAddres := os.Getenv("SERVER_ADDRESS"); evnServerAddres != "" {
+		config.ServerAddress = evnServerAddres
+	}
+
+	if evnBaseURLAddress := os.Getenv("BASE_URL"); evnBaseURLAddress != "" {
+		config.BaseURLAddress = evnBaseURLAddress
+	}
 
 	fmt.Println("Server address:", config.ServerAddress)
 	fmt.Println("Base short URL:", config.BaseURLAddress)
