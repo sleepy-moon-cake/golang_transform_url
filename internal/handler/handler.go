@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/config"
+	"github.com/sleepy-moon-cake/golang_transform_url/internal/logger"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/service"
 )
 
@@ -16,7 +17,7 @@ func ListenAndServe(cng *config.Config) error {
 
 	router := createRouter(&handler)
 
-	return http.ListenAndServe(cng.ServerAddress, router)
+	return http.ListenAndServe(cng.ServerAddress, logger.Logger(router))
 }
 
 func createRouter(handler *URLHandle) http.Handler {

@@ -9,6 +9,7 @@ import (
 type Config struct {
 	ServerAddress  string
 	BaseURLAddress string
+	LoggerLevel    string
 }
 
 func GetConfig() *Config {
@@ -16,6 +17,7 @@ func GetConfig() *Config {
 
 	flag.StringVar(&config.ServerAddress, "a", "localhost:8080", "server address")
 	flag.StringVar(&config.BaseURLAddress, "b", "http://localhost:8080", "base shorted URL")
+	flag.StringVar(&config.LoggerLevel, "l", "info", "log level")
 
 	flag.Parse()
 
@@ -27,8 +29,13 @@ func GetConfig() *Config {
 		config.BaseURLAddress = evnBaseURLAddress
 	}
 
+	if evnLoggerLevel := os.Getenv("LOG_LEVEL"); evnLoggerLevel != "" {
+		config.LoggerLevel = evnLoggerLevel
+	}
+
 	fmt.Println("Server address:", config.ServerAddress)
 	fmt.Println("Base short URL:", config.BaseURLAddress)
+	fmt.Println("Log level:", config.LoggerLevel)
 
 	return &config
 }
