@@ -89,8 +89,11 @@ func (h URLHandle) shortenURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
 
-	var response = model.ShortenUrlResponse{Result: service.CreateShortURL(shortenURL.URL)}
+	shortURL := fmt.Sprintf("%s/%s", h.baseURL, service.CreateShortURL(shortenURL.URL))
+
+	var response = model.ShortenUrlResponse{Result: shortURL}
 
 	enc := json.NewEncoder(w)
 	if err := enc.Encode(response); err != nil {
