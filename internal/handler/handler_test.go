@@ -92,3 +92,43 @@ func TestUrlHandle_GetshortURL(t *testing.T) {
 		})
 	}
 }
+
+func TestUrlHandle_ShortenURL(t *testing.T) {
+	h := URLHandle{baseURL: domainURL}
+
+	t.Run("API shorten url - positive", func(t *testing.T) {
+		// Формируем JSON-тело
+		jsonBody := `{"url":"` + longURL + `"}`
+
+		request := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(jsonBody))
+		request.Header.Set("Content-Type", "application/json")
+
+		w := httptest.NewRecorder()
+
+		h.shortenURL(w, request)
+
+		result := w.Result()
+		defer result.Body.Close()
+
+		// Проверяем статус и заголовки
+		assert.Equal(t, http.StatusOK, result.StatusCode)
+		assert.Contains(t, result.Header.Get("Content-Type"), "application/json")
+
+		// Проверяем тело ответа
+		resBody, err := io.ReadAll(result.Body)
+		require.NoError(t, err)
+
+		// Ожидаем JSON формата {"result": "..."}
+		assert.Contains(t, string(resBody), `"result"`)
+		require.NotEmpty(t, resBody)
+	})
+
+	t.Run("API shorten url - invalid json", func(t *testing.T) {
+		request := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(`{invalid json}`))
+		w := httptest.NewRecorder()
+
+		h.shortenURL(w, request)
+
+		assert.Equal(t, http.StatusInternalServerError, w.Result().StatusCode)
+	})
+}

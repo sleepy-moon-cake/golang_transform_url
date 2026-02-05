@@ -1,14 +1,17 @@
 package handler
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/config"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/logger"
+	"github.com/sleepy-moon-cake/golang_transform_url/internal/model"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/service"
 )
 
@@ -27,6 +30,10 @@ func createRouter(handler *URLHandle) http.Handler {
 		r.Get("/{shortURL}", handler.getShortURL)
 		r.Post("/", handler.createShortURL)
 	})
+	r.Route("/api", func(r chi.Router) {
+		r.Post("/shorten", handler.shortenURL)
+	})
+
 	return r
 }
 
@@ -69,4 +76,27 @@ func (h URLHandle) getShortURL(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Add("Location", originalURL)
 	w.WriteHeader(http.StatusTemporaryRedirect)
+}
+
+func (h URLHandle) shortenURL(w http.ResponseWriter, r *http.Request) {
+	var shortenURL model.ShortenUrlRequest
+
+	dec := json.NewDecoder(r.Body)
+	if err := dec.Decode(&shortenURL); err != nil {
+		slog.Debug("Decoding is failed", slog.String("Method", r.Method), slog.String("path", r.URL.Path))
+
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	var response = model.ShortenUrlResponse{Result: service.CreateShortURL(shortenURL.URL)}
+
+	enc := json.NewEncoder(w)
+	if err := enc.Encode(response); err != nil {
+		slog.Debug("Encoding is failed", slog.String("Method", r.Method), slog.String("path", r.URL.Path))
+
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	slog.Debug("HTTP 200")
 }
