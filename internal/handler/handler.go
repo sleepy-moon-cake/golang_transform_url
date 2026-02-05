@@ -86,6 +86,7 @@ func (h URLHandle) shortenURL(w http.ResponseWriter, r *http.Request) {
 		slog.Debug("Decoding is failed", slog.String("Method", r.Method), slog.String("path", r.URL.Path))
 
 		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
