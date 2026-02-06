@@ -111,7 +111,7 @@ func TestUrlHandle_ShortenURL(t *testing.T) {
 		defer result.Body.Close()
 
 		// Проверяем статус и заголовки
-		assert.Equal(t, http.StatusOK, result.StatusCode)
+		assert.Equal(t, http.StatusCreated, result.StatusCode)
 		assert.Contains(t, result.Header.Get("Content-Type"), "application/json")
 
 		// Проверяем тело ответа
