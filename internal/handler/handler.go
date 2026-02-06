@@ -79,7 +79,7 @@ func (h URLHandle) getShortURL(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h URLHandle) shortenURL(w http.ResponseWriter, r *http.Request) {
-	var shortenURL model.ShortenUrlRequest
+	var shortenURL model.ShortenURLRequest
 
 	dec := json.NewDecoder(r.Body)
 	if err := dec.Decode(&shortenURL); err != nil {
@@ -94,7 +94,7 @@ func (h URLHandle) shortenURL(w http.ResponseWriter, r *http.Request) {
 
 	shortURL := fmt.Sprintf("%s/%s", h.baseURL, service.CreateShortURL(shortenURL.URL))
 
-	var response = model.ShortenUrlResponse{Result: shortURL}
+	var response = model.ShortenURLResponse{Result: shortURL}
 
 	enc := json.NewEncoder(w)
 	if err := enc.Encode(response); err != nil {

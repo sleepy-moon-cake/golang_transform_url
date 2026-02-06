@@ -97,7 +97,6 @@ func TestUrlHandle_ShortenURL(t *testing.T) {
 	h := URLHandle{baseURL: domainURL}
 
 	t.Run("API shorten url - positive", func(t *testing.T) {
-		// Формируем JSON-тело
 		jsonBody := `{"url":"` + longURL + `"}`
 
 		request := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(jsonBody))
@@ -129,6 +128,9 @@ func TestUrlHandle_ShortenURL(t *testing.T) {
 
 		h.shortenURL(w, request)
 
-		assert.Equal(t, http.StatusInternalServerError, w.Result().StatusCode)
+		result := w.Result()
+		defer result.Body.Close()
+
+		assert.Equal(t, http.StatusInternalServerError, result.StatusCode)
 	})
 }
