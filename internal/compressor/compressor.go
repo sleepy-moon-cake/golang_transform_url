@@ -97,7 +97,7 @@ func Compressor(h http.Handler) http.Handler {
 			r.Body = cr
 		}
 
-		if shouldCompressResponse(r) {
+		if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
 			cw := newCompressWriter(w)
 			defer cw.Close()
 			w = cw
@@ -105,13 +105,6 @@ func Compressor(h http.Handler) http.Handler {
 
 		h.ServeHTTP(w, r)
 	})
-}
-
-func shouldCompressResponse(r *http.Request) bool {
-	if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
-		return false
-	}
-	return true
 }
 
 func shouldDecompressRequest(_ http.ResponseWriter, r *http.Request) bool {
@@ -122,7 +115,7 @@ func shouldDecompressRequest(_ http.ResponseWriter, r *http.Request) bool {
 	for _, v := range r.Header.Values("Content-Encoding") {
 		if isSupport := strings.Contains(v, "gzip"); isSupport {
 			ct := r.Header.Get("Content-Type")
-			return strings.HasPrefix(ct, "application/json") || strings.HasPrefix(ct, "text/html")
+			return strings.HasPrefix(ct, "application/json") || strings.HasPrefix(ct, "text/html") || strings.HasPrefix(ct, "text/plain")
 		}
 	}
 	return false
