@@ -17,7 +17,7 @@ import (
 )
 
 func ListenAndServe(cng *config.Config) error {
-	handler := URLHandle{baseURL: cng.BaseURLAddress}
+	handler := URLHandle{baseURL: cng.BaseURLAddress, service: service.NewService(cng.FileStoragePath)}
 
 	router := createRouter(&handler)
 
@@ -40,6 +40,7 @@ func createRouter(handler *URLHandle) http.Handler {
 
 type URLHandle struct {
 	baseURL string
+	service *service.Service
 }
 
 func (h URLHandle) createShortURL(w http.ResponseWriter, r *http.Request) {
@@ -54,7 +55,7 @@ func (h URLHandle) createShortURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := service.CreateShortURL(string(body))
+	id := h.service.CreateShortURL(string(body))
 
 	slog.Info("CreateShortURL", slog.String("URL", string(body)), slog.String("URL-ID", id))
 
@@ -71,7 +72,7 @@ func (h URLHandle) getShortURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	shortURL := strings.TrimPrefix(r.URL.Path, "/")
-	originalURL, err := service.GetURLByCode(shortURL)
+	originalURL, err := h.service.GetURLByCode(shortURL)
 
 	slog.Info("GetShortURL", slog.String("URL-SHORT", shortURL), slog.String("URL-ORIGIN", originalURL))
 
@@ -98,7 +99,7 @@ func (h URLHandle) shortenURL(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 
-	shortURL := fmt.Sprintf("%s/%s", h.baseURL, service.CreateShortURL(shortenURL.URL))
+	shortURL := fmt.Sprintf("%s/%s", h.baseURL, h.service.CreateShortURL(shortenURL.URL))
 
 	var response = model.ShortenURLResponse{Result: shortURL}
 

@@ -7,9 +7,10 @@ import (
 )
 
 type Config struct {
-	ServerAddress  string
-	BaseURLAddress string
-	LoggerLevel    string
+	ServerAddress   string
+	BaseURLAddress  string
+	LoggerLevel     string
+	FileStoragePath string
 }
 
 func GetConfig() *Config {
@@ -18,6 +19,7 @@ func GetConfig() *Config {
 	flag.StringVar(&config.ServerAddress, "a", "localhost:8080", "server address")
 	flag.StringVar(&config.BaseURLAddress, "b", "http://localhost:8080", "base shorted URL")
 	flag.StringVar(&config.LoggerLevel, "l", "info", "log level")
+	flag.StringVar(&config.FileStoragePath, "f", "/storage.json", "path to storage file")
 
 	flag.Parse()
 
@@ -31,6 +33,10 @@ func GetConfig() *Config {
 
 	if evnLoggerLevel := os.Getenv("LOG_LEVEL"); evnLoggerLevel != "" {
 		config.LoggerLevel = evnLoggerLevel
+	}
+
+	if fileStoragePath := os.Getenv("FILE_STORAGE_PATH"); fileStoragePath != "" {
+		config.FileStoragePath = fileStoragePath
 	}
 
 	fmt.Println("Server address:", config.ServerAddress)

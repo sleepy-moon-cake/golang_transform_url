@@ -7,3 +7,9 @@ type ShortenURLRequest struct {
 type ShortenURLResponse struct {
 	Result string `json:"result"`
 }
+
+type ShortenURLRecord struct {
+	ID          string `json:"uuid"`
+	ShortURL    string `json:"short_url"`
+	OriginalURL string `json:"original_url"`
+}

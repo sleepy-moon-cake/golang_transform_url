@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -16,7 +17,7 @@ const domainURL = "http://localhost:8080"
 const longURL = "https://practicum.yandex.ru/"
 
 func TestUrlHandle_CreateshortURL(t *testing.T) {
-	h := URLHandle{baseURL: domainURL}
+	h := newTestHandle(t)
 
 	t.Run("Create url", func(t *testing.T) {
 		request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(longURL))
@@ -39,7 +40,7 @@ func TestUrlHandle_CreateshortURL(t *testing.T) {
 }
 
 func TestUrlHandle_GetshortURL(t *testing.T) {
-	h := URLHandle{baseURL: domainURL}
+	h := newTestHandle(t)
 
 	tests := []struct {
 		name       string
@@ -61,7 +62,7 @@ func TestUrlHandle_GetshortURL(t *testing.T) {
 		{
 			name: "get short url - positive",
 			setup: func() string {
-				return service.CreateShortURL(longURL)
+				return h.service.CreateShortURL(longURL)
 			},
 			wantStatus: http.StatusTemporaryRedirect,
 		},
@@ -94,7 +95,7 @@ func TestUrlHandle_GetshortURL(t *testing.T) {
 }
 
 func TestUrlHandle_ShortenURL(t *testing.T) {
-	h := URLHandle{baseURL: domainURL}
+	h := newTestHandle(t)
 
 	t.Run("API shorten url - positive", func(t *testing.T) {
 		jsonBody := `{"url":"` + longURL + `"}`
@@ -133,4 +134,12 @@ func TestUrlHandle_ShortenURL(t *testing.T) {
 
 		assert.Equal(t, http.StatusInternalServerError, result.StatusCode)
 	})
+}
+
+func newTestHandle(t *testing.T) *URLHandle {
+	tmpFile, err := os.CreateTemp("", "storage_*.json")
+	require.NoError(t, err)
+	t.Cleanup(func() { os.Remove(tmpFile.Name()) })
+	svc := service.NewService(tmpFile.Name())
+	return &URLHandle{baseURL: domainURL, service: svc}
 }
