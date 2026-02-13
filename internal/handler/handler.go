@@ -55,6 +55,9 @@ func (h URLHandle) createShortURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id := service.CreateShortURL(string(body))
+
+	slog.Info("CreateShortURL", slog.String("URL", string(body)), slog.String("URL-ID", id))
+
 	shortURL := fmt.Sprintf("%s/%s", h.baseURL, id)
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
@@ -69,6 +72,8 @@ func (h URLHandle) getShortURL(w http.ResponseWriter, r *http.Request) {
 
 	shortURL := strings.TrimPrefix(r.URL.Path, "/")
 	originalURL, err := service.GetURLByCode(shortURL)
+
+	slog.Info("GetShortURL", slog.String("URL-SHORT", shortURL), slog.String("URL-ORIGIN", originalURL))
 
 	if err != nil {
 		http.Error(w, "", http.StatusBadRequest)
