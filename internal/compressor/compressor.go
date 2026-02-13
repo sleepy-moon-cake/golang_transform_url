@@ -114,6 +114,10 @@ func shouldCompressResponse(r *http.Request) bool {
 }
 
 func shouldDecompressRequest(_ http.ResponseWriter, r *http.Request) bool {
+	if r.Method != http.MethodPost && r.Method != http.MethodPut && r.Method != http.MethodPatch {
+		return false
+	}
+
 	for _, v := range r.Header.Values("Content-Encoding") {
 		if isSupport := strings.Contains(v, "gzip"); isSupport {
 			ct := r.Header.Get("Content-Type")
