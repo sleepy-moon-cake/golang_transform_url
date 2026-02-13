@@ -50,7 +50,8 @@ func (c *compressWriter) WriteHeader(statusCode int) {
 
 	ct := c.Header().Get("Content-Type")
 
-	if statusCode < 300 && (strings.HasPrefix(ct, "application/json") || strings.HasPrefix(ct, "text/html")) {
+	if statusCode >= 200 && statusCode < 300 &&
+		(strings.HasPrefix(ct, "application/json") || strings.HasPrefix(ct, "text/html")) {
 		c.Header().Set("Content-Encoding", "gzip")
 		c.compress = true
 	}
