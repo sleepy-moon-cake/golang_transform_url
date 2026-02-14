@@ -17,7 +17,7 @@ type Repository struct {
 	store           map[string]model.ShortenURLRecord
 }
 
-var NotFoundRecord = errors.New("Not found")
+var ErrNotFound = errors.New("Not found")
 
 func NewRepository(fileStoragePath string) *Repository {
 	rep := Repository{fileStoragePath: fileStoragePath, store: make(map[string]model.ShortenURLRecord)}
@@ -55,7 +55,7 @@ func (r *Repository) FindByCode(code string) (model.ShortenURLRecord, error) {
 	if record, ok := r.store[code]; ok {
 		return record, nil
 	}
-	return model.ShortenURLRecord{}, NotFoundRecord
+	return model.ShortenURLRecord{}, ErrNotFound
 }
 
 func (r *Repository) fillCasheStorage() error {
