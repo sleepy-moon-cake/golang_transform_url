@@ -55,7 +55,13 @@ func (h URLHandle) createShortURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := h.service.CreateShortURL(string(body))
+	id, err := h.service.CreateShortURL(string(body))
+
+	if err != nil {
+		slog.Error("Failed to create short URL", slog.String("URL", string(body)), slog.String("Error", err.Error()))
+		http.Error(w, "Failed to create short URL", http.StatusInternalServerError)
+		return
+	}
 
 	slog.Info("CreateShortURL", slog.String("URL", string(body)), slog.String("URL-ID", id))
 
@@ -99,7 +105,15 @@ func (h URLHandle) shortenURL(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 
-	shortURL := fmt.Sprintf("%s/%s", h.baseURL, h.service.CreateShortURL(shortenURL.URL))
+	recordURl, err := h.service.CreateShortURL(shortenURL.URL)
+
+	if err != nil {
+		slog.Error("Failed to send short URL", slog.String("Error", err.Error()))
+		http.Error(w, "Failed to send short URL", http.StatusInternalServerError)
+		return
+	}
+
+	shortURL := fmt.Sprintf("%s/%s", h.baseURL, recordURl)
 
 	var response = model.ShortenURLResponse{Result: shortURL}
 

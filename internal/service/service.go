@@ -2,41 +2,34 @@ package service
 
 import (
 	"crypto/rand"
-	"encoding/json"
-	"errors"
+	"log/slog"
 	"math/big"
-	"os"
-	"sync"
 
 	"github.com/google/uuid"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/model"
+	"github.com/sleepy-moon-cake/golang_transform_url/internal/repository"
 )
 
 func NewService(path string) *Service {
+	repository := repository.NewRepository(path)
+
 	return &Service{
 		fileStoragePath: path,
+		repository:      repository,
 	}
 }
 
 type Service struct {
+	repository      *repository.Repository
 	fileStoragePath string
-	mutex           sync.Mutex
 }
 
-func (s *Service) CreateShortURL(str string) string {
-	records, err := s.getAllRecords()
-
-	if err != nil {
-		panic(err)
-	}
-
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
+func (s *Service) CreateShortURL(str string) (string, error) {
 	key, err := generateKey()
 
 	if err != nil {
-		panic(err)
+		slog.Error("Key generation")
+		return "", err
 	}
 
 	record := model.ShortenURLRecord{
@@ -45,59 +38,22 @@ func (s *Service) CreateShortURL(str string) string {
 		OriginalURL: str,
 	}
 
-	records = append(records, record)
-
-	file, err := os.OpenFile(s.fileStoragePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
-
-	if err != nil {
-		panic(err)
+	if err := s.repository.Save(record); err != nil {
+		slog.Error("Save record")
+		return "", err
 	}
-	defer file.Close()
 
-	if err := json.NewEncoder(file).Encode(&records); err != nil {
-		panic(err)
-	}
-	return key
+	return key, nil
 }
 
 func (s *Service) GetURLByCode(code string) (string, error) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	records, err := s.getAllRecords()
+	record, err := s.repository.FindByCode(code)
 
 	if err != nil {
-		return "", errors.New("cant read records")
+		return "", err
 	}
 
-	for _, v := range records {
-		if v.ShortURL == code {
-			return v.OriginalURL, nil
-		}
-	}
-
-	return "", errors.New("no data")
-}
-
-func (s *Service) getAllRecords() ([]model.ShortenURLRecord, error) {
-	records := []model.ShortenURLRecord{}
-
-	data, err := os.ReadFile(s.fileStoragePath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return records, nil
-		}
-		return nil, err
-	}
-
-	if len(data) == 0 {
-		return records, nil
-	}
-
-	if err := json.Unmarshal(data, &records); err != nil {
-		return nil, err
-	}
-
-	return records, nil
+	return record.OriginalURL, nil
 }
 
 func generateKey() (string, error) {

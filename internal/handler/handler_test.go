@@ -44,7 +44,7 @@ func TestUrlHandle_GetshortURL(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		setup      func() string
+		setup      func() (string, error)
 		path       string
 		wantStatus int
 		wantBody   string
@@ -61,7 +61,7 @@ func TestUrlHandle_GetshortURL(t *testing.T) {
 		},
 		{
 			name: "get short url - positive",
-			setup: func() string {
+			setup: func() (string, error) {
 				return h.service.CreateShortURL(longURL)
 			},
 			wantStatus: http.StatusTemporaryRedirect,
@@ -72,7 +72,9 @@ func TestUrlHandle_GetshortURL(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			shortID := tt.path
 			if tt.setup != nil {
-				shortID = tt.setup()
+				if value, err := tt.setup(); err == nil {
+					shortID = value
+				}
 			}
 
 			req := httptest.NewRequest(http.MethodGet, "/"+shortID, nil)
