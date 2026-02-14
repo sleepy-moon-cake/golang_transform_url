@@ -17,7 +17,7 @@ type Repository struct {
 	store           map[string]model.ShortenURLRecord
 }
 
-var ErrNotFound = errors.New("Not found")
+var ErrNotFound = errors.New("not found")
 
 func NewRepository(fileStoragePath string) *Repository {
 	rep := Repository{fileStoragePath: fileStoragePath, store: make(map[string]model.ShortenURLRecord)}
