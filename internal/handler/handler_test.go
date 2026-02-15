@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -16,7 +17,7 @@ const domainURL = "http://localhost:8080"
 const longURL = "https://practicum.yandex.ru/"
 
 func TestUrlHandle_CreateshortURL(t *testing.T) {
-	h := URLHandle{baseURL: domainURL}
+	h := newTestHandle(t)
 
 	t.Run("Create url", func(t *testing.T) {
 		request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(longURL))
@@ -39,11 +40,11 @@ func TestUrlHandle_CreateshortURL(t *testing.T) {
 }
 
 func TestUrlHandle_GetshortURL(t *testing.T) {
-	h := URLHandle{baseURL: domainURL}
+	h := newTestHandle(t)
 
 	tests := []struct {
 		name       string
-		setup      func() string
+		setup      func() (string, error)
 		path       string
 		wantStatus int
 		wantBody   string
@@ -60,8 +61,8 @@ func TestUrlHandle_GetshortURL(t *testing.T) {
 		},
 		{
 			name: "get short url - positive",
-			setup: func() string {
-				return service.CreateShortURL(longURL)
+			setup: func() (string, error) {
+				return h.service.CreateShortURL(longURL)
 			},
 			wantStatus: http.StatusTemporaryRedirect,
 		},
@@ -71,7 +72,9 @@ func TestUrlHandle_GetshortURL(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			shortID := tt.path
 			if tt.setup != nil {
-				shortID = tt.setup()
+				if value, err := tt.setup(); err == nil {
+					shortID = value
+				}
 			}
 
 			req := httptest.NewRequest(http.MethodGet, "/"+shortID, nil)
@@ -91,4 +94,54 @@ func TestUrlHandle_GetshortURL(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUrlHandle_ShortenURL(t *testing.T) {
+	h := newTestHandle(t)
+
+	t.Run("API shorten url - positive", func(t *testing.T) {
+		jsonBody := `{"url":"` + longURL + `"}`
+
+		request := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(jsonBody))
+		request.Header.Set("Content-Type", "application/json")
+
+		w := httptest.NewRecorder()
+
+		h.shortenURL(w, request)
+
+		result := w.Result()
+		defer result.Body.Close()
+
+		// Проверяем статус и заголовки
+		assert.Equal(t, http.StatusCreated, result.StatusCode)
+		assert.Contains(t, result.Header.Get("Content-Type"), "application/json")
+
+		// Проверяем тело ответа
+		resBody, err := io.ReadAll(result.Body)
+		require.NoError(t, err)
+
+		// Ожидаем JSON формата {"result": "..."}
+		assert.Contains(t, string(resBody), `"result"`)
+		require.NotEmpty(t, resBody)
+	})
+
+	t.Run("API shorten url - invalid json", func(t *testing.T) {
+		request := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(`{invalid json}`))
+		w := httptest.NewRecorder()
+
+		h.shortenURL(w, request)
+
+		result := w.Result()
+		defer result.Body.Close()
+
+		assert.Equal(t, http.StatusInternalServerError, result.StatusCode)
+	})
+}
+
+func newTestHandle(t *testing.T) *URLHandle {
+	tmpFile, err := os.CreateTemp("", "storage_*.json")
+	require.NoError(t, err)
+	t.Cleanup(func() { os.Remove(tmpFile.Name()) })
+	svc := service.NewService(tmpFile.Name())
+	return &URLHandle{baseURL: domainURL, service: svc}
 }

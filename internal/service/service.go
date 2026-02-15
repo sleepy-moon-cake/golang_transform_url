@@ -2,31 +2,58 @@ package service
 
 import (
 	"crypto/rand"
-	"errors"
+	"log/slog"
 	"math/big"
-	"sync"
+
+	"github.com/google/uuid"
+	"github.com/sleepy-moon-cake/golang_transform_url/internal/model"
+	"github.com/sleepy-moon-cake/golang_transform_url/internal/repository"
 )
 
-var URLStorage sync.Map
+func NewService(path string) *Service {
+	repository := repository.NewRepository(path)
 
-func CreateShortURL(str string) string {
-	key, err := generateKey()
-	if err != nil {
-		panic(err)
+	return &Service{
+		fileStoragePath: path,
+		repository:      repository,
 	}
-
-	URLStorage.Store(key, str)
-
-	return key
 }
 
-func GetURLByCode(code string) (string, error) {
-	v, ok := URLStorage.Load(code)
-	if !ok {
-		return "", errors.New("no data")
+type Service struct {
+	repository      *repository.Repository
+	fileStoragePath string
+}
+
+func (s *Service) CreateShortURL(str string) (string, error) {
+	key, err := generateKey()
+
+	if err != nil {
+		slog.Error("Key generation")
+		return "", err
 	}
 
-	return v.(string), nil
+	record := model.ShortenURLRecord{
+		ID:          uuid.NewString(),
+		ShortURL:    key,
+		OriginalURL: str,
+	}
+
+	if err := s.repository.Save(record); err != nil {
+		slog.Error("Save record")
+		return "", err
+	}
+
+	return key, nil
+}
+
+func (s *Service) GetURLByCode(code string) (string, error) {
+	record, err := s.repository.FindByCode(code)
+
+	if err != nil {
+		return "", err
+	}
+
+	return record.OriginalURL, nil
 }
 
 func generateKey() (string, error) {
