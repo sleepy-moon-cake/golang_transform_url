@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"log/slog"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
@@ -22,6 +23,8 @@ func NewSQLDB(ctx context.Context, databaseDSN string) (*DBSQL, error) {
 		db.Close()
 		return nil, err
 	}
+
+	slog.Info("DATABASE CONNECTED", slog.String("DNS", databaseDSN))
 
 	return &DBSQL{db}, nil
 }
