@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"log/slog"
 	"net/http"
@@ -27,11 +26,6 @@ func main() {
 	defer cancel()
 
 	db, err := db.NewSQLDB(ctx, cfg.DatabaseDSN)
-
-	fmt.Println("START__INFFF")
-	fmt.Println(db)
-	fmt.Println(err)
-	fmt.Println("END___INFFF")
 
 	if err != nil {
 		if cfg.DatabaseDSN != "" {

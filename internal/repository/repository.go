@@ -26,7 +26,7 @@ type Repository struct {
 var ErrNotFound = errors.New("not found")
 
 func NewRepository(fileStoragePath string, db DB) *Repository {
-	rep := Repository{fileStoragePath: fileStoragePath, store: make(map[string]model.ShortenURLRecord)}
+	rep := Repository{fileStoragePath: fileStoragePath, store: make(map[string]model.ShortenURLRecord), db: db}
 	if err := rep.fillCasheStorage(); err != nil {
 		slog.Error("Filling cashe error", slog.String("Error", err.Error()))
 	}
@@ -91,7 +91,7 @@ func (r *Repository) fillCasheStorage() error {
 
 func (r *Repository) Ping(ctx context.Context) error {
 	if r.db == nil {
-		return errors.New("DB is nil")
+		return errors.New("database not initialized")
 	}
 	return r.db.PingContext(ctx)
 }
