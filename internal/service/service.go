@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"crypto/rand"
 	"log/slog"
 	"math/big"
@@ -10,18 +11,14 @@ import (
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/repository"
 )
 
-func NewService(path string) *Service {
-	repository := repository.NewRepository(path)
-
-	return &Service{
-		fileStoragePath: path,
-		repository:      repository,
-	}
+type Service struct {
+	repository *repository.Repository
 }
 
-type Service struct {
-	repository      *repository.Repository
-	fileStoragePath string
+func NewService(repository *repository.Repository) *Service {
+	return &Service{
+		repository: repository,
+	}
 }
 
 func (s *Service) CreateShortURL(str string) (string, error) {
@@ -71,4 +68,8 @@ func generateKey() (string, error) {
 	}
 
 	return string(b), nil
+}
+
+func (s *Service) Ping(ctx context.Context) error {
+	return s.repository.Ping(ctx)
 }

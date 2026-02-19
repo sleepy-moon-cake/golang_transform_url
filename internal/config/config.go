@@ -11,6 +11,7 @@ type Config struct {
 	BaseURLAddress  string
 	LoggerLevel     string
 	FileStoragePath string
+	DatabaseDSN     string
 }
 
 func GetConfig() *Config {
@@ -20,6 +21,7 @@ func GetConfig() *Config {
 	flag.StringVar(&config.BaseURLAddress, "b", "http://localhost:8080", "base shorted URL")
 	flag.StringVar(&config.LoggerLevel, "l", "info", "log level")
 	flag.StringVar(&config.FileStoragePath, "f", "/storage.json", "path to storage file")
+	flag.StringVar(&config.DatabaseDSN, "d", "postgres://user:password@localhost:5432/mydb", "postgress url")
 
 	flag.Parse()
 
@@ -39,9 +41,14 @@ func GetConfig() *Config {
 		config.FileStoragePath = fileStoragePath
 	}
 
+	if databaseDSN := os.Getenv("DATABASE_DSN"); databaseDSN != "" {
+		config.DatabaseDSN = databaseDSN
+	}
+
 	fmt.Println("Server address:", config.ServerAddress)
 	fmt.Println("Base short URL:", config.BaseURLAddress)
 	fmt.Println("Log level:", config.LoggerLevel)
+	fmt.Println("DatabaseDNS", config.DatabaseDSN)
 
 	return &config
 }

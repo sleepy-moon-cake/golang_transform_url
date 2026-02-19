@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -8,42 +9,25 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/sleepy-moon-cake/golang_transform_url/internal/compressor"
-	"github.com/sleepy-moon-cake/golang_transform_url/internal/config"
-	"github.com/sleepy-moon-cake/golang_transform_url/internal/logger"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/model"
-	"github.com/sleepy-moon-cake/golang_transform_url/internal/service"
 )
-
-func ListenAndServe(cng *config.Config) error {
-	handler := URLHandle{baseURL: cng.BaseURLAddress, service: service.NewService(cng.FileStoragePath)}
-
-	router := createRouter(&handler)
-
-	return http.ListenAndServe(cng.ServerAddress, logger.Logger(compressor.Compressor(router)))
-}
-
-func createRouter(handler *URLHandle) http.Handler {
-	r := chi.NewRouter()
-
-	r.Route("/", func(r chi.Router) {
-		r.Get("/{shortURL}", handler.getShortURL)
-		r.Post("/", handler.createShortURL)
-	})
-	r.Route("/api", func(r chi.Router) {
-		r.Post("/shorten", handler.shortenURL)
-	})
-
-	return r
-}
 
 type URLHandle struct {
 	baseURL string
-	service *service.Service
+	service URLService
 }
 
-func (h URLHandle) createShortURL(w http.ResponseWriter, r *http.Request) {
+type URLService interface {
+	CreateShortURL(str string) (string, error)
+	GetURLByCode(code string) (string, error)
+	Ping(ctx context.Context) error
+}
+
+func NewURLHandler(baseURL string, service URLService) *URLHandle {
+	return &URLHandle{baseURL: baseURL, service: service}
+}
+
+func (h URLHandle) CreateShortURL(w http.ResponseWriter, r *http.Request) {
 	if !strings.HasPrefix(r.Header.Get("Content-Type"), "text/plain") {
 		http.Error(w, "", http.StatusBadRequest)
 		return
@@ -71,7 +55,7 @@ func (h URLHandle) createShortURL(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(shortURL))
 }
 
-func (h URLHandle) getShortURL(w http.ResponseWriter, r *http.Request) {
+func (h URLHandle) GetShortURL(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/" {
 		http.Error(w, "", http.StatusBadRequest)
 		return
@@ -91,7 +75,7 @@ func (h URLHandle) getShortURL(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
-func (h URLHandle) shortenURL(w http.ResponseWriter, r *http.Request) {
+func (h URLHandle) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	var shortenURL model.ShortenURLRequest
 
 	dec := json.NewDecoder(r.Body)
@@ -124,4 +108,12 @@ func (h URLHandle) shortenURL(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 	slog.Debug("HTTP 200")
+}
+
+func (h *URLHandle) Ping(w http.ResponseWriter, r *http.Request) {
+	if err := h.service.Ping(r.Context()); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/sleepy-moon-cake/golang_transform_url/internal/repository"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/service"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,7 +26,7 @@ func TestUrlHandle_CreateshortURL(t *testing.T) {
 
 		w := httptest.NewRecorder()
 
-		h.createShortURL(w, request)
+		h.CreateShortURL(w, request)
 
 		result := w.Result()
 		defer result.Body.Close()
@@ -80,7 +81,7 @@ func TestUrlHandle_GetshortURL(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/"+shortID, nil)
 			w := httptest.NewRecorder()
 
-			h.getShortURL(w, req)
+			h.GetShortURL(w, req)
 
 			res := w.Result()
 			defer res.Body.Close()
@@ -107,7 +108,7 @@ func TestUrlHandle_ShortenURL(t *testing.T) {
 
 		w := httptest.NewRecorder()
 
-		h.shortenURL(w, request)
+		h.ShortenURL(w, request)
 
 		result := w.Result()
 		defer result.Body.Close()
@@ -129,7 +130,7 @@ func TestUrlHandle_ShortenURL(t *testing.T) {
 		request := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(`{invalid json}`))
 		w := httptest.NewRecorder()
 
-		h.shortenURL(w, request)
+		h.ShortenURL(w, request)
 
 		result := w.Result()
 		defer result.Body.Close()
@@ -141,7 +142,11 @@ func TestUrlHandle_ShortenURL(t *testing.T) {
 func newTestHandle(t *testing.T) *URLHandle {
 	tmpFile, err := os.CreateTemp("", "storage_*.json")
 	require.NoError(t, err)
+
 	t.Cleanup(func() { os.Remove(tmpFile.Name()) })
-	svc := service.NewService(tmpFile.Name())
+
+	repo := repository.NewRepository(tmpFile.Name())
+	svc := service.NewService(repo)
+
 	return &URLHandle{baseURL: domainURL, service: svc}
 }

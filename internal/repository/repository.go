@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -11,10 +12,15 @@ import (
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/model"
 )
 
+type DB interface {
+	PingContext(context.Context) error
+}
+
 type Repository struct {
 	mutex           sync.RWMutex
 	fileStoragePath string
 	store           map[string]model.ShortenURLRecord
+	db              DB
 }
 
 var ErrNotFound = errors.New("not found")
@@ -81,4 +87,8 @@ func (r *Repository) fillCasheStorage() error {
 		r.store[record.ShortURL] = record
 	}
 	return nil
+}
+
+func (r *Repository) Ping(ctx context.Context) error {
+	return r.db.PingContext(ctx)
 }
