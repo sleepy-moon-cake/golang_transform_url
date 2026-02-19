@@ -26,7 +26,7 @@ func main() {
 	defer cancel()
 
 	db, err := db.NewSQLDB(ctx, cfg.DatabaseDSN)
-
+	
 	if err != nil {
 		if cfg.DatabaseDSN != "" {
 			slog.Error("Database err", slog.String("err", err.Error()))
@@ -42,7 +42,7 @@ func main() {
 	}
 }
 
-func listenAndServe(cng *config.Config, db *db.DbSQL) error {
+func listenAndServe(cng *config.Config, db *db.DBSQL) error {
 	repository := repository.NewRepository(cng.FileStoragePath, db)
 	service := service.NewService(repository)
 	handler := handler.NewURLHandler(cng.BaseURLAddress, service)

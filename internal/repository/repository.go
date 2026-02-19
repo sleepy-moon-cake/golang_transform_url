@@ -90,5 +90,8 @@ func (r *Repository) fillCasheStorage() error {
 }
 
 func (r *Repository) Ping(ctx context.Context) error {
+	if r.db == nil {
+		return errors.New("DB is nil")
+	}
 	return r.db.PingContext(ctx)
 }

@@ -7,11 +7,11 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
-type DbSQL struct {
+type DBSQL struct {
 	*sql.DB
 }
 
-func NewSQLDB(ctx context.Context, databaseDSN string) (*DbSQL, error) {
+func NewSQLDB(ctx context.Context, databaseDSN string) (*DBSQL, error) {
 	db, err := sql.Open("pgx", databaseDSN)
 
 	if err != nil {
@@ -23,5 +23,5 @@ func NewSQLDB(ctx context.Context, databaseDSN string) (*DbSQL, error) {
 		return nil, err
 	}
 
-	return &DbSQL{db}, nil
+	return &DBSQL{db}, nil
 }
