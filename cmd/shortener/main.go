@@ -25,11 +25,14 @@ func main() {
 
 	defer cancel()
 
-	db, err := db.NewSqlDB(ctx, cfg.DatabaseDSN)
+	db, err := db.NewSQLDB(ctx, cfg.DatabaseDSN)
 
 	if err != nil {
-		slog.Error("Database err", slog.String("err", err.Error()))
-		panic(err)
+		if cfg.DatabaseDSN != "" {
+			slog.Error("Database err", slog.String("err", err.Error()))
+			panic(err)
+		}
+		db = nil
 	}
 
 	logger.Init(cfg.LoggerLevel)
@@ -39,8 +42,8 @@ func main() {
 	}
 }
 
-func listenAndServe(cng *config.Config, db *db.DbSql) error {
-	repository := repository.NewRepository(cng.FileStoragePath)
+func listenAndServe(cng *config.Config, db *db.DbSQL) error {
+	repository := repository.NewRepository(cng.FileStoragePath, db)
 	service := service.NewService(repository)
 	handler := handler.NewURLHandler(cng.BaseURLAddress, service)
 

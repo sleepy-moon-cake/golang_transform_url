@@ -145,7 +145,7 @@ func newTestHandle(t *testing.T) *URLHandle {
 
 	t.Cleanup(func() { os.Remove(tmpFile.Name()) })
 
-	repo := repository.NewRepository(tmpFile.Name())
+	repo := repository.NewRepository(tmpFile.Name(), nil)
 	svc := service.NewService(repo)
 
 	return &URLHandle{baseURL: domainURL, service: svc}

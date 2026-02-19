@@ -25,7 +25,7 @@ type Repository struct {
 
 var ErrNotFound = errors.New("not found")
 
-func NewRepository(fileStoragePath string) *Repository {
+func NewRepository(fileStoragePath string, db DB) *Repository {
 	rep := Repository{fileStoragePath: fileStoragePath, store: make(map[string]model.ShortenURLRecord)}
 	if err := rep.fillCasheStorage(); err != nil {
 		slog.Error("Filling cashe error", slog.String("Error", err.Error()))
