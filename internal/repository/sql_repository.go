@@ -27,7 +27,7 @@ func (r *SQLRepository) Save(ctx context.Context, record model.ShortenURLRecord)
 }
 
 func (r *SQLRepository) Ping(ctx context.Context) error {
-	return errors.New("")
+	return nil
 }
 
 func (r *SQLRepository) FindByCode(ctx context.Context, code string) (model.ShortenURLRecord, error) {
