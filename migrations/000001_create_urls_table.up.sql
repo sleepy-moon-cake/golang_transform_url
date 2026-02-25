@@ -1,5 +1,5 @@
-CREATE TABLE urls (
+CREATE TABLE IF NOT EXISTS urls (
     id SERIAL PRIMARY KEY,
-    short text
-    original text
-)
+    short TEXT,  
+    original TEXT 
+);
