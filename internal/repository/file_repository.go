@@ -18,7 +18,7 @@ type FileRepository struct {
 }
 
 func NewFileRepository(filePath string) *FileRepository {
-	fr := FileRepository{fileStoragePath: filePath}
+	fr := FileRepository{fileStoragePath: filePath, store: make(map[string]model.ShortenURLRecord)}
 	fr.fillCasheStorage()
 	return &fr
 }
