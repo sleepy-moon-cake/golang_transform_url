@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -63,7 +64,7 @@ func TestUrlHandle_GetshortURL(t *testing.T) {
 		{
 			name: "get short url - positive",
 			setup: func() (string, error) {
-				return h.service.CreateShortURL(longURL)
+				return h.service.CreateShortURL(context.TODO(), longURL)
 			},
 			wantStatus: http.StatusTemporaryRedirect,
 		},

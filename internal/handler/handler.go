@@ -18,8 +18,8 @@ type URLHandle struct {
 }
 
 type URLService interface {
-	CreateShortURL(str string) (string, error)
-	GetURLByCode(code string) (string, error)
+	CreateShortURL(ctx context.Context, str string) (string, error)
+	GetURLByCode(ctx context.Context, code string) (string, error)
 	Ping(ctx context.Context) error
 }
 
@@ -39,7 +39,7 @@ func (h URLHandle) CreateShortURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := h.service.CreateShortURL(string(body))
+	id, err := h.service.CreateShortURL(r.Context(), string(body))
 
 	if err != nil {
 		slog.Error("Failed to create short URL", slog.String("URL", string(body)), slog.String("Error", err.Error()))
@@ -62,7 +62,7 @@ func (h URLHandle) GetShortURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	shortURL := strings.TrimPrefix(r.URL.Path, "/")
-	originalURL, err := h.service.GetURLByCode(shortURL)
+	originalURL, err := h.service.GetURLByCode(r.Context(), shortURL)
 
 	slog.Info("GetShortURL", slog.String("URL-SHORT", shortURL), slog.String("URL-ORIGIN", originalURL))
 
@@ -89,7 +89,7 @@ func (h URLHandle) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 
-	recordURL, err := h.service.CreateShortURL(shortenURL.URL)
+	recordURL, err := h.service.CreateShortURL(r.Context(), shortenURL.URL)
 
 	if err != nil {
 		slog.Error("Failed to send short URL", slog.String("Error", err.Error()))

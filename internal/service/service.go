@@ -12,16 +12,16 @@ import (
 )
 
 type Service struct {
-	repository *repository.Repository
+	repository repository.Repository
 }
 
-func NewService(repository *repository.Repository) *Service {
+func NewService(repository repository.Repository) *Service {
 	return &Service{
 		repository: repository,
 	}
 }
 
-func (s *Service) CreateShortURL(str string) (string, error) {
+func (s *Service) CreateShortURL(ctx context.Context, str string) (string, error) {
 	key, err := generateKey()
 
 	if err != nil {
@@ -35,7 +35,7 @@ func (s *Service) CreateShortURL(str string) (string, error) {
 		OriginalURL: str,
 	}
 
-	if err := s.repository.Save(record); err != nil {
+	if err := s.repository.Save(ctx, record); err != nil {
 		slog.Error("Save record")
 		return "", err
 	}
@@ -43,8 +43,8 @@ func (s *Service) CreateShortURL(str string) (string, error) {
 	return key, nil
 }
 
-func (s *Service) GetURLByCode(code string) (string, error) {
-	record, err := s.repository.FindByCode(code)
+func (s *Service) GetURLByCode(ctx context.Context, code string) (string, error) {
+	record, err := s.repository.FindByCode(ctx, code)
 
 	if err != nil {
 		return "", err
