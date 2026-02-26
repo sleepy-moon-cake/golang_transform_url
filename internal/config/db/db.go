@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/sleepy-moon-cake/golang_transform_url/migrations"
 )
 
 type DBSQL struct {
@@ -25,6 +26,12 @@ func NewSQLDB(ctx context.Context, databaseDSN string) (*DBSQL, error) {
 	}
 
 	slog.Info("DATABASE CONNECTED", slog.String("DNS", databaseDSN))
+
+	if err := migrations.RunMigrations(db); err != nil {
+		return nil, err
+	}
+
+	slog.Info("DATABASE MIGRATION COMPLETE")
 
 	return &DBSQL{db}, nil
 }
