@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"sync"
 
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/model"
@@ -20,8 +19,10 @@ func NewSQLRepository(db *sql.DB) *SQLRepository {
 
 func (r *SQLRepository) Save(ctx context.Context, record model.ShortenURLRecord) error {
 	_, err := r.db.ExecContext(ctx,
-		"INSERT INTO urls (original, short) VALUES ($1, $2)",
-		&record.OriginalURL, &record.ShortURL)
+		"INSERT INTO urls (original_url, short_url) VALUES ($1, $2)",
+		record.OriginalURL,
+		record.ShortURL,
+	)
 
 	return err
 }
@@ -31,5 +32,17 @@ func (r *SQLRepository) Ping(ctx context.Context) error {
 }
 
 func (r *SQLRepository) FindByCode(ctx context.Context, code string) (model.ShortenURLRecord, error) {
-	return model.ShortenURLRecord{}, errors.New("")
+	var record model.ShortenURLRecord
+
+	err := r.db.QueryRowContext(
+		ctx,
+		"SELECT original_url, short_url FROM urls WHERE short_url = $1",
+		code,
+	).Scan(&record.OriginalURL, &record.ShortURL)
+
+	if err != nil {
+		return model.ShortenURLRecord{}, err
+	}
+
+	return record, nil
 }
