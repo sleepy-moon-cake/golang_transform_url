@@ -46,3 +46,22 @@ func (r *SQLRepository) FindByCode(ctx context.Context, code string) (model.Shor
 
 	return record, nil
 }
+
+func (r *SQLRepository) Batch(ctx context.Context, shortenURLRecords []model.ShortenURLRecord) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	for _, record := range shortenURLRecords {
+		_, err := tx.ExecContext(ctx, "INSERT INTO urls (short_url,original_url) VALUES ($1, $2)",
+			record.ShortURL, record.OriginalURL)
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}

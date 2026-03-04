@@ -21,6 +21,7 @@ type URLService interface {
 	CreateShortURL(ctx context.Context, str string) (string, error)
 	GetURLByCode(ctx context.Context, code string) (string, error)
 	Ping(ctx context.Context) error
+	Batch(ctx context.Context, shorURLBatch []model.ShortenURLBatchRequest) ([]model.ShortenURLBatchResponse, error)
 }
 
 func NewURLHandler(baseURL string, service URLService) *URLHandle {
@@ -116,4 +117,34 @@ func (h *URLHandle) Ping(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+func (h *URLHandle) Batch(w http.ResponseWriter, r *http.Request) {
+	var requestData []model.ShortenURLBatchRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		slog.Error("Batch, decoding", slog.String("Error", err.Error()))
+		return
+	}
+
+	responseData, err := h.service.Batch(r.Context(), requestData)
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		slog.Error("Batch, saving", slog.String("Error", err.Error()))
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+
+	for i := range responseData {
+		responseData[i].ShortURL = fmt.Sprintf("%s/%s", h.baseURL, responseData[i].ShortURL)
+	}
+
+	if err := json.NewEncoder(w).Encode(responseData); err != nil {
+		slog.Error("Batch, sending", slog.String("Error", err.Error()))
+		return
+	}
 }

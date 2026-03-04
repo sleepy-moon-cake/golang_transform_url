@@ -81,3 +81,30 @@ func (r *FileRepository) fillCasheStorage() error {
 func (r *FileRepository) Ping(_ context.Context) error {
 	return errors.New("database not initialized")
 }
+
+func (r *FileRepository) Batch(ctx context.Context, shortenURLRecords []model.ShortenURLRecord) error {
+	r.mutex.Lock()
+
+	file, err := os.OpenFile(r.fileStoragePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+
+	if err != nil {
+		return err
+	}
+
+	defer file.Close()
+	defer r.mutex.Unlock()
+
+	encoder := json.NewEncoder(file)
+
+	for _, url := range shortenURLRecords {
+		if err := encoder.Encode(url); err != nil {
+			return err
+		}
+	}
+
+	for _, url := range shortenURLRecords {
+		r.store[url.ShortURL] = url
+	}
+
+	return nil
+}

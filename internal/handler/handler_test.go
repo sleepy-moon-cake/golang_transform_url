@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/sleepy-moon-cake/golang_transform_url/internal/model"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/repository"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/service"
 	"github.com/stretchr/testify/assert"
@@ -150,4 +152,68 @@ func newTestHandle(t *testing.T) *URLHandle {
 	svc := service.NewService(repo)
 
 	return &URLHandle{baseURL: domainURL, service: svc}
+}
+
+func TestUrlHandle_Batch(t *testing.T) {
+	h := newTestHandle(t)
+
+	t.Run("Batch shorten - success", func(t *testing.T) {
+		// Подготавливаем JSON-запрос с двумя ссылками
+		jsonBody := `[
+			{"correlation_id": "first-id", "original_url": "https://google.com"},
+			{"correlation_id": "second-id", "original_url": "https://yandex.ru"}
+		]`
+
+		request := httptest.NewRequest(http.MethodPost, "/api/shorten/batch", strings.NewReader(jsonBody))
+		request.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+
+		h.Batch(w, request)
+
+		result := w.Result()
+		defer result.Body.Close()
+
+		// 1. Проверяем статус 201 Created
+		assert.Equal(t, http.StatusCreated, result.StatusCode)
+		
+		// 2. Проверяем заголовок Content-Type
+		assert.Contains(t, result.Header.Get("Content-Type"), "application/json")
+
+		// 3. Декодируем тело ответа для детальной проверки
+		var response []model.ShortenURLBatchResponse
+		err := json.NewDecoder(result.Body).Decode(&response)
+		require.NoError(t, err)
+
+		// 4. Проверяем длину и содержимое
+		assert.Len(t, response, 2)
+		
+		// Проверяем, что correlation_id вернулись правильно
+		assert.Equal(t, "first-id", response[0].CorrelationID)
+		assert.Equal(t, "second-id", response[1].CorrelationID)
+		
+		// Проверяем, что сформированы короткие ссылки с твоим доменом
+		assert.Contains(t, response[0].ShortURL, domainURL)
+		assert.Contains(t, response[1].ShortURL, domainURL)
+	})
+
+	t.Run("Batch shorten - empty array", func(t *testing.T) {
+		request := httptest.NewRequest(http.MethodPost, "/api/shorten/batch", strings.NewReader(`[]`))
+		request.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+
+		h.Batch(w, request)
+
+		assert.Equal(t, http.StatusCreated, w.Code)
+		assert.Equal(t, "[]\n", w.Body.String()) // Encode добавляет перенос строки
+	})
+
+	t.Run("Batch shorten - invalid JSON", func(t *testing.T) {
+		// Присылаем объект вместо массива
+		request := httptest.NewRequest(http.MethodPost, "/api/shorten/batch", strings.NewReader(`{"id": "not a batch"}`))
+		w := httptest.NewRecorder()
+
+		h.Batch(w, request)
+
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+	})
 }

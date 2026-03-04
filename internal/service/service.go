@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"math/big"
 
-	"github.com/google/uuid"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/model"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/repository"
 )
@@ -30,7 +29,6 @@ func (s *Service) CreateShortURL(ctx context.Context, str string) (string, error
 	}
 
 	record := model.ShortenURLRecord{
-		ID:          uuid.NewString(),
 		ShortURL:    key,
 		OriginalURL: str,
 	}
@@ -72,4 +70,34 @@ func generateKey() (string, error) {
 
 func (s *Service) Ping(ctx context.Context) error {
 	return s.repository.Ping(ctx)
+}
+
+func (s *Service) Batch(ctx context.Context, shortURLBatch []model.ShortenURLBatchRequest) ([]model.ShortenURLBatchResponse, error) {
+	shortenURLBatchRequestRecords := make([]model.ShortenURLBatchResponse, 0, len(shortURLBatch))
+	records := make([]model.ShortenURLRecord, 0, len(shortURLBatch))
+
+	for _, url := range shortURLBatch {
+		key, err := generateKey()
+
+		if err != nil {
+			slog.Error("Key generation")
+			return nil, err
+		}
+
+		records = append(records, model.ShortenURLRecord{
+			ShortURL:    key,
+			OriginalURL: url.OriginalURL,
+		})
+
+		shortenURLBatchRequestRecords = append(shortenURLBatchRequestRecords, model.ShortenURLBatchResponse{
+			CorrelationID: url.CorrelationID,
+			ShortURL:      key,
+		})
+	}
+
+	if err := s.repository.Batch(ctx, records); err != nil {
+		return nil, err
+	}
+
+	return shortenURLBatchRequestRecords, nil
 }

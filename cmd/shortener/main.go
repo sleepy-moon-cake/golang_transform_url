@@ -61,6 +61,7 @@ func createRouter(handler *handler.URLHandle) http.Handler {
 	})
 	r.Route("/api", func(r chi.Router) {
 		r.Post("/shorten", handler.ShortenURL)
+		r.Post("/shorten/batch", handler.Batch)
 	})
 
 	r.Route("/ping", func(r chi.Router) {
