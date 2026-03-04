@@ -8,11 +8,6 @@ type ShortenURLResponse struct {
 	Result string `json:"result"`
 }
 
-type ShortenURLRecordWithCorrelationId struct {
-	CorrelationID string `json:"correlation_id"`
-	ShortenURLRecord
-}
-
 type ShortenURLRecord struct {
 	ID          int    `json:"id"`
 	ShortURL    string `json:"short_url"`
