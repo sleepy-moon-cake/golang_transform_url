@@ -11,7 +11,7 @@ import (
 type Repository interface {
 	Ping(ctx context.Context) error
 	FindByCode(ctx context.Context, code string) (model.ShortenURLRecord, error)
-	Save(ctx context.Context, record model.ShortenURLRecord) error
+	Save(ctx context.Context, record model.ShortenURLRecord) (model.ShortenURLRecord, error)
 	Batch(ctx context.Context, shortenURLRecords []model.ShortenURLRecord) error
 }
 

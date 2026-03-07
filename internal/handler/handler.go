@@ -55,13 +55,13 @@ func (h URLHandle) CreateShortURL(w http.ResponseWriter, r *http.Request) {
 	shortURL := fmt.Sprintf("%s/%s", h.baseURL, id)
 	w.Header().Set("Content-Type", "text/plain")
 
-	if err != nil {
-		w.WriteHeader(http.StatusConflict)
-		w.Write([]byte(shortURL))
-		return
+	status := http.StatusCreated
+
+	if errors.Is(err, repository.ErrURLConflict) {
+		status = http.StatusConflict
 	}
 
-	w.WriteHeader(http.StatusCreated)
+	w.WriteHeader(status)
 	w.Write([]byte(shortURL))
 }
 
@@ -86,38 +86,47 @@ func (h URLHandle) GetShortURL(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h URLHandle) ShortenURL(w http.ResponseWriter, r *http.Request) {
-	var shortenURL model.ShortenURLRequest
+	defer r.Body.Close()
 
-	dec := json.NewDecoder(r.Body)
-	if err := dec.Decode(&shortenURL); err != nil {
-		slog.Debug("Decoding is failed", slog.String("Method", r.Method), slog.String("path", r.URL.Path))
+	var req model.ShortenURLRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		slog.Debug("decoding failed",
+			slog.String("method", r.Method),
+			slog.String("path", r.URL.Path),
+		)
 
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
+	recordURL, err := h.service.CreateShortURL(r.Context(), req.URL)
 
-	recordURL, err := h.service.CreateShortURL(r.Context(), shortenURL.URL)
-
-	if err != nil {
-		slog.Error("Failed to send short URL", slog.String("Error", err.Error()))
-		http.Error(w, "Failed to send short URL", http.StatusInternalServerError)
+	if err != nil && !errors.Is(err, repository.ErrURLConflict) {
+		slog.Error("failed to create short url", slog.String("error", err.Error()))
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
 	shortURL := fmt.Sprintf("%s/%s", h.baseURL, recordURL)
 
-	var response = model.ShortenURLResponse{Result: shortURL}
-
-	enc := json.NewEncoder(w)
-	if err := enc.Encode(response); err != nil {
-		slog.Debug("Encoding is failed", slog.String("Method", r.Method), slog.String("path", r.URL.Path))
-
-		w.WriteHeader(http.StatusInternalServerError)
+	response := model.ShortenURLResponse{
+		Result: shortURL,
 	}
-	slog.Debug("HTTP 200")
+
+	w.Header().Set("Content-Type", "application/json")
+
+	status := http.StatusCreated
+
+	if errors.Is(err, repository.ErrURLConflict) {
+		status = http.StatusConflict
+	}
+
+	w.WriteHeader(status)
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		slog.Debug("encoding failed", slog.String("error", err.Error()))
+	}
 }
 
 func (h *URLHandle) Ping(w http.ResponseWriter, r *http.Request) {

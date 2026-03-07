@@ -23,25 +23,25 @@ func NewFileRepository(filePath string) *FileRepository {
 	return &fr
 }
 
-func (r *FileRepository) Save(_ context.Context, record model.ShortenURLRecord) error {
+func (r *FileRepository) Save(_ context.Context, record model.ShortenURLRecord) (model.ShortenURLRecord, error) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
 	file, err := os.OpenFile(r.fileStoragePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
 
 	if err != nil {
-		return err
+		return model.ShortenURLRecord{}, err
 	}
 
 	defer file.Close()
 
 	if err := json.NewEncoder(file).Encode(record); err != nil {
-		return err
+		return model.ShortenURLRecord{}, err
 	}
 
 	r.store[record.ShortURL] = record
 
-	return nil
+	return record, nil
 }
 
 func (r *FileRepository) FindByCode(_ context.Context, code string) (model.ShortenURLRecord, error) {

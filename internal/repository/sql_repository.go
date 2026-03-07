@@ -20,7 +20,7 @@ func NewSQLRepository(db *sql.DB) *SQLRepository {
 	return &SQLRepository{db: db}
 }
 
-func (r *SQLRepository) Save(ctx context.Context, record model.ShortenURLRecord) error {
+func (r *SQLRepository) Save(ctx context.Context, record model.ShortenURLRecord) (model.ShortenURLRecord, error) {
 	_, err := r.db.ExecContext(ctx,
 		"INSERT INTO urls (original_url, short_url) VALUES ($1, $2)",
 		record.OriginalURL,
@@ -30,10 +30,26 @@ func (r *SQLRepository) Save(ctx context.Context, record model.ShortenURLRecord)
 	var pgErr *pgconn.PgError
 
 	if errors.As(err, &pgErr) && pgerrcode.IsIntegrityConstraintViolation(pgErr.Code) {
-		return ErrURLConflict
+		var existingRecord model.ShortenURLRecord
+
+		err = r.db.QueryRowContext(
+			ctx,
+			`SELECT original_url, short_url FROM urls WHERE original_url = $1`,
+			record.OriginalURL,
+		).Scan(&existingRecord.OriginalURL, &existingRecord.ShortURL)
+
+		if err != nil {
+			return model.ShortenURLRecord{}, err
+		}
+
+		return existingRecord, ErrURLConflict
 	}
 
-	return err
+	if err != nil {
+		return model.ShortenURLRecord{}, err
+	}
+
+	return record, nil
 }
 
 func (r *SQLRepository) Ping(ctx context.Context) error {
