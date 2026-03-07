@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -10,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/model"
+	"github.com/sleepy-moon-cake/golang_transform_url/internal/repository"
 )
 
 type URLHandle struct {
@@ -42,7 +44,7 @@ func (h URLHandle) CreateShortURL(w http.ResponseWriter, r *http.Request) {
 
 	id, err := h.service.CreateShortURL(r.Context(), string(body))
 
-	if err != nil {
+	if err != nil && !errors.Is(err, repository.ErrURLConflict) {
 		slog.Error("Failed to create short URL", slog.String("URL", string(body)), slog.String("Error", err.Error()))
 		http.Error(w, "Failed to create short URL", http.StatusInternalServerError)
 		return
@@ -52,6 +54,13 @@ func (h URLHandle) CreateShortURL(w http.ResponseWriter, r *http.Request) {
 
 	shortURL := fmt.Sprintf("%s/%s", h.baseURL, id)
 	w.Header().Set("Content-Type", "text/plain")
+
+	if err != nil {
+		w.WriteHeader(http.StatusConflict)
+		w.Write([]byte(shortURL))
+		return
+	}
+
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte(shortURL))
 }

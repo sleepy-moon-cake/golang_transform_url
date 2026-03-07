@@ -3,8 +3,11 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"sync"
 
+	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/model"
 )
 
@@ -23,6 +26,12 @@ func (r *SQLRepository) Save(ctx context.Context, record model.ShortenURLRecord)
 		record.OriginalURL,
 		record.ShortURL,
 	)
+
+	var pgErr *pgconn.PgError
+
+	if errors.As(err, &pgErr) && pgerrcode.IsIntegrityConstraintViolation(pgErr.Code) {
+		return ErrURLConflict
+	}
 
 	return err
 }

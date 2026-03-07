@@ -23,4 +23,6 @@ func NewRepository(filePath string, db *db.DBSQL) Repository {
 	return NewFileRepository(filePath)
 }
 
+var ErrURLConflict = errors.New("DB already has that URL")
+
 var ErrNotFound = errors.New("not found")
