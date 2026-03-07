@@ -33,9 +33,9 @@ func (s *Service) CreateShortURL(ctx context.Context, str string) (string, error
 		OriginalURL: str,
 	}
 
-	if _, err := s.repository.Save(ctx, record); err != nil {
+	if record, err := s.repository.Save(ctx, record); err != nil {
 		slog.Error("Save record")
-		return key, err
+		return record.ShortURL, err
 	}
 
 	return key, nil
