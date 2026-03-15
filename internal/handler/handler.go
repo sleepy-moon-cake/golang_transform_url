@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/model"
@@ -52,7 +53,13 @@ func (h URLHandle) CreateShortURL(w http.ResponseWriter, r *http.Request) {
 
 	slog.Info("CreateShortURL", slog.String("URL", string(body)), slog.String("URL-ID", id))
 
-	shortURL := fmt.Sprintf("%s/%s", h.baseURL, id)
+	shortURL, err := url.JoinPath(h.baseURL, id)
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "text/plain")
 
 	status := http.StatusCreated

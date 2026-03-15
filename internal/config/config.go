@@ -2,7 +2,7 @@ package config
 
 import (
 	"flag"
-	"fmt"
+	"log/slog"
 	"os"
 )
 
@@ -25,30 +25,31 @@ func GetConfig() *Config {
 
 	flag.Parse()
 
-	if evnServerAddres := os.Getenv("SERVER_ADDRESS"); evnServerAddres != "" {
+	if evnServerAddres, ok := os.LookupEnv("SERVER_ADDRESS"); ok {
 		config.ServerAddress = evnServerAddres
 	}
 
-	if evnBaseURLAddress := os.Getenv("BASE_URL"); evnBaseURLAddress != "" {
+	if evnBaseURLAddress, ok := os.LookupEnv("BASE_URL"); ok {
 		config.BaseURLAddress = evnBaseURLAddress
 	}
 
-	if evnLoggerLevel := os.Getenv("LOG_LEVEL"); evnLoggerLevel != "" {
+	if evnLoggerLevel, ok := os.LookupEnv("LOG_LEVEL"); ok {
 		config.LoggerLevel = evnLoggerLevel
 	}
 
-	if fileStoragePath := os.Getenv("FILE_STORAGE_PATH"); fileStoragePath != "" {
+	if fileStoragePath, ok := os.LookupEnv("FILE_STORAGE_PATH"); ok {
 		config.FileStoragePath = fileStoragePath
 	}
 
-	if databaseDSN := os.Getenv("DATABASE_DSN"); databaseDSN != "" {
+	if databaseDSN, ok := os.LookupEnv("DATABASE_DSN"); ok {
 		config.DatabaseDSN = databaseDSN
 	}
 
-	fmt.Println("Server address:", config.ServerAddress)
-	fmt.Println("Base short URL:", config.BaseURLAddress)
-	fmt.Println("Log level:", config.LoggerLevel)
-	fmt.Println("DatabaseDNS", config.DatabaseDSN)
+	slog.Info("Configurations:::",
+		slog.String("Server address", config.ServerAddress),
+		slog.String("Base short URL", config.BaseURLAddress),
+		slog.String("Log level", config.LoggerLevel),
+	)
 
 	return &config
 }

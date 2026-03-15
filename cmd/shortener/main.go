@@ -5,6 +5,7 @@ import (
 	"log"
 	"log/slog"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -25,19 +26,22 @@ func main() {
 
 	defer cancel()
 
-	db, err := db.NewSQLDB(ctx, cfg.DatabaseDSN)
+	var database *db.DBSQL
 
-	if err != nil {
-		if cfg.DatabaseDSN != "" {
+	if cfg.DatabaseDSN != "" {
+		dbSQL, err := db.NewSQLDB(ctx, cfg.DatabaseDSN)
+
+		if err != nil {
 			slog.Error("Database err", slog.String("err", err.Error()))
-			panic(err)
+			os.Exit(1)
 		}
-		db = nil
+
+		database = dbSQL
 	}
 
 	logger.Init(cfg.LoggerLevel)
 
-	if err := listenAndServe(cfg, db); err != nil {
+	if err := listenAndServe(cfg, database); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -49,11 +53,13 @@ func listenAndServe(cng *config.Config, db *db.DBSQL) error {
 
 	router := createRouter(handler)
 
-	return http.ListenAndServe(cng.ServerAddress, logger.Logger(compressor.Compressor(router)))
+	return http.ListenAndServe(cng.ServerAddress, router)
 }
 
 func createRouter(handler *handler.URLHandle) http.Handler {
 	r := chi.NewRouter()
+	r.Use(logger.Logger)
+	r.Use(compressor.Compressor)
 
 	r.Route("/", func(r chi.Router) {
 		r.Get("/{shortURL}", handler.GetShortURL)
@@ -64,9 +70,7 @@ func createRouter(handler *handler.URLHandle) http.Handler {
 		r.Post("/shorten/batch", handler.Batch)
 	})
 
-	r.Route("/ping", func(r chi.Router) {
-		r.Get("/", handler.Ping)
-	})
+	r.Get("/ping", handler.Ping)
 
 	return r
 }
