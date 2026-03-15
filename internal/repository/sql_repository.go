@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/jackc/pgerrcode"
@@ -39,20 +41,24 @@ func (r *SQLRepository) Save(ctx context.Context, record model.ShortenURLRecord)
 		).Scan(&existingRecord.OriginalURL, &existingRecord.ShortURL)
 
 		if err != nil {
-			return model.ShortenURLRecord{}, err
+			return model.ShortenURLRecord{}, fmt.Errorf("database save: %w", err)
 		}
 
 		return existingRecord, ErrURLConflict
 	}
 
 	if err != nil {
-		return model.ShortenURLRecord{}, err
+		return model.ShortenURLRecord{}, fmt.Errorf("database save: %w", err)
 	}
 
 	return record, nil
 }
 
 func (r *SQLRepository) Ping(ctx context.Context) error {
+	if err := r.db.PingContext(ctx); err != nil {
+		return fmt.Errorf("database pind: %w", err)
+	}
+
 	return nil
 }
 
@@ -66,7 +72,7 @@ func (r *SQLRepository) FindByCode(ctx context.Context, code string) (model.Shor
 	).Scan(&record.OriginalURL, &record.ShortURL)
 
 	if err != nil {
-		return model.ShortenURLRecord{}, err
+		return model.ShortenURLRecord{}, fmt.Errorf("database findByCode: %w", err)
 	}
 
 	return record, nil
@@ -79,13 +85,22 @@ func (r *SQLRepository) Batch(ctx context.Context, shortenURLRecords []model.Sho
 	}
 	defer tx.Rollback()
 
-	for _, record := range shortenURLRecords {
-		_, err := tx.ExecContext(ctx, "INSERT INTO urls (short_url,original_url) VALUES ($1, $2)",
-			record.ShortURL, record.OriginalURL)
+	values := make([]string, 0, len(shortenURLRecords))
+	args := make([]any, 0, len(shortenURLRecords)*2)
 
-		if err != nil {
-			return err
-		}
+	for i, record := range shortenURLRecords {
+		values = append(values, fmt.Sprintf("($%d,$%d)", i*2+1, i*2+2))
+		args = append(args, record.ShortURL, record.OriginalURL)
+	}
+
+	query := fmt.Sprintf(
+		"INSERT INTO urls (short_url, original_url) VALUES %s",
+		strings.Join(values, ","),
+	)
+
+	_, err = tx.ExecContext(ctx, query, args...)
+	if err != nil {
+		return fmt.Errorf("database batch: %w", err)
 	}
 
 	return tx.Commit()

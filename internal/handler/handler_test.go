@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -66,7 +65,7 @@ func TestUrlHandle_GetshortURL(t *testing.T) {
 		{
 			name: "get short url - positive",
 			setup: func() (string, error) {
-				return h.service.CreateShortURL(context.TODO(), longURL)
+				return h.service.CreateShortURL(t.Context(), longURL)
 			},
 			wantStatus: http.StatusTemporaryRedirect,
 		},
@@ -175,7 +174,7 @@ func TestUrlHandle_Batch(t *testing.T) {
 
 		// 1. Проверяем статус 201 Created
 		assert.Equal(t, http.StatusCreated, result.StatusCode)
-		
+
 		// 2. Проверяем заголовок Content-Type
 		assert.Contains(t, result.Header.Get("Content-Type"), "application/json")
 
@@ -186,11 +185,11 @@ func TestUrlHandle_Batch(t *testing.T) {
 
 		// 4. Проверяем длину и содержимое
 		assert.Len(t, response, 2)
-		
+
 		// Проверяем, что correlation_id вернулись правильно
 		assert.Equal(t, "first-id", response[0].CorrelationID)
 		assert.Equal(t, "second-id", response[1].CorrelationID)
-		
+
 		// Проверяем, что сформированы короткие ссылки с твоим доменом
 		assert.Contains(t, response[0].ShortURL, domainURL)
 		assert.Contains(t, response[1].ShortURL, domainURL)

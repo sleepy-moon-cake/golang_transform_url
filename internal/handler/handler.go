@@ -47,7 +47,7 @@ func (h URLHandle) CreateShortURL(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil && !errors.Is(err, repository.ErrURLConflict) {
 		slog.Error("Failed to create short URL", slog.String("URL", string(body)), slog.String("Error", err.Error()))
-		http.Error(w, "Failed to create short URL", http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
