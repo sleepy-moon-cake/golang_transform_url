@@ -43,29 +43,29 @@ func (h URLHandle) CreateShortURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := h.service.CreateShortURL(r.Context(), string(body))
+	id, createErr := h.service.CreateShortURL(r.Context(), string(body))
 
-	if err != nil && !errors.Is(err, repository.ErrURLConflict) {
-		slog.Error("Failed to create short URL", slog.String("URL", string(body)), slog.String("Error", err.Error()))
+	if createErr != nil && !errors.Is(createErr, repository.ErrURLConflict) {
+		slog.Error("Failed to create short URL", slog.String("URL", string(body)), slog.String("Error", createErr.Error()))
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
 	slog.Info("CreateShortURL", slog.String("URL", string(body)), slog.String("URL-ID", id))
 
-	shortURL, err := url.JoinPath(h.baseURL, id)
-
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
 	w.Header().Set("Content-Type", "text/plain")
 
 	status := http.StatusCreated
 
-	if errors.Is(err, repository.ErrURLConflict) {
+	if errors.Is(createErr, repository.ErrURLConflict) {
 		status = http.StatusConflict
+	}
+
+	shortURL, joinErr := url.JoinPath(h.baseURL, id)
+
+	if joinErr != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 
 	w.WriteHeader(status)
