@@ -26,7 +26,7 @@ func NewSQLDB(ctx context.Context, databaseDSN string) (*DBSQL, error) {
 		return nil, fmt.Errorf("ping db: %w", err)
 	}
 
-	slog.Info("DATABASE CONNECTED", slog.String("DNS", databaseDSN))
+	slog.Info("DATABASE CONNECTED")
 
 	if err := migrations.RunMigrations(db); err != nil {
 		return nil, fmt.Errorf("migration db: %w", err)

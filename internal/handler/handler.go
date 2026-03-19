@@ -46,7 +46,7 @@ func (h URLHandle) CreateShortURL(w http.ResponseWriter, r *http.Request) {
 	id, createErr := h.service.CreateShortURL(r.Context(), string(body))
 
 	if createErr != nil && !errors.Is(createErr, repository.ErrURLConflict) {
-		slog.Error("Failed to create short URL", slog.String("URL", string(body)), slog.String("Error", createErr.Error()))
+		slog.Error("CreateShortURL", slog.String("URL", string(body)), slog.String("Error", createErr.Error()))
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -110,12 +110,17 @@ func (h URLHandle) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	recordURL, err := h.service.CreateShortURL(r.Context(), req.URL)
 
 	if err != nil && !errors.Is(err, repository.ErrURLConflict) {
-		slog.Error("failed to create short url", slog.String("error", err.Error()))
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		slog.Error("ShortenURL", slog.String("error", err.Error()))
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
-	shortURL := fmt.Sprintf("%s/%s", h.baseURL, recordURL)
+	shortURL, joinErr := url.JoinPath(h.baseURL, recordURL)
+
+	if joinErr != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
 
 	response := model.ShortenURLResponse{
 		Result: shortURL,
