@@ -1,49 +1,37 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/sleepy-moon-cake/golang_transform_url/internal/compressor"
-	"github.com/sleepy-moon-cake/golang_transform_url/internal/config"
-	"github.com/sleepy-moon-cake/golang_transform_url/internal/logger"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/model"
-	"github.com/sleepy-moon-cake/golang_transform_url/internal/service"
+	"github.com/sleepy-moon-cake/golang_transform_url/internal/repository"
 )
-
-func ListenAndServe(cng *config.Config) error {
-	handler := URLHandle{baseURL: cng.BaseURLAddress, service: service.NewService(cng.FileStoragePath)}
-
-	router := createRouter(&handler)
-
-	return http.ListenAndServe(cng.ServerAddress, logger.Logger(compressor.Compressor(router)))
-}
-
-func createRouter(handler *URLHandle) http.Handler {
-	r := chi.NewRouter()
-
-	r.Route("/", func(r chi.Router) {
-		r.Get("/{shortURL}", handler.getShortURL)
-		r.Post("/", handler.createShortURL)
-	})
-	r.Route("/api", func(r chi.Router) {
-		r.Post("/shorten", handler.shortenURL)
-	})
-
-	return r
-}
 
 type URLHandle struct {
 	baseURL string
-	service *service.Service
+	service URLService
 }
 
-func (h URLHandle) createShortURL(w http.ResponseWriter, r *http.Request) {
+type URLService interface {
+	CreateShortURL(ctx context.Context, str string) (string, error)
+	GetURLByCode(ctx context.Context, code string) (string, error)
+	Ping(ctx context.Context) error
+	Batch(ctx context.Context, shorURLBatch []model.ShortenURLBatchRequest) ([]model.ShortenURLBatchResponse, error)
+}
+
+func NewURLHandler(baseURL string, service URLService) *URLHandle {
+	return &URLHandle{baseURL: baseURL, service: service}
+}
+
+func (h URLHandle) CreateShortURL(w http.ResponseWriter, r *http.Request) {
 	if !strings.HasPrefix(r.Header.Get("Content-Type"), "text/plain") {
 		http.Error(w, "", http.StatusBadRequest)
 		return
@@ -55,30 +43,43 @@ func (h URLHandle) createShortURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := h.service.CreateShortURL(string(body))
+	id, createErr := h.service.CreateShortURL(r.Context(), string(body))
 
-	if err != nil {
-		slog.Error("Failed to create short URL", slog.String("URL", string(body)), slog.String("Error", err.Error()))
-		http.Error(w, "Failed to create short URL", http.StatusInternalServerError)
+	if createErr != nil && !errors.Is(createErr, repository.ErrURLConflict) {
+		slog.Error("CreateShortURL", slog.String("URL", string(body)), slog.String("Error", createErr.Error()))
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
 	slog.Info("CreateShortURL", slog.String("URL", string(body)), slog.String("URL-ID", id))
 
-	shortURL := fmt.Sprintf("%s/%s", h.baseURL, id)
 	w.Header().Set("Content-Type", "text/plain")
-	w.WriteHeader(http.StatusCreated)
+
+	status := http.StatusCreated
+
+	if errors.Is(createErr, repository.ErrURLConflict) {
+		status = http.StatusConflict
+	}
+
+	shortURL, joinErr := url.JoinPath(h.baseURL, id)
+
+	if joinErr != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(status)
 	w.Write([]byte(shortURL))
 }
 
-func (h URLHandle) getShortURL(w http.ResponseWriter, r *http.Request) {
+func (h URLHandle) GetShortURL(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/" {
 		http.Error(w, "", http.StatusBadRequest)
 		return
 	}
 
 	shortURL := strings.TrimPrefix(r.URL.Path, "/")
-	originalURL, err := h.service.GetURLByCode(shortURL)
+	originalURL, err := h.service.GetURLByCode(r.Context(), shortURL)
 
 	slog.Info("GetShortURL", slog.String("URL-SHORT", shortURL), slog.String("URL-ORIGIN", originalURL))
 
@@ -91,37 +92,89 @@ func (h URLHandle) getShortURL(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
-func (h URLHandle) shortenURL(w http.ResponseWriter, r *http.Request) {
-	var shortenURL model.ShortenURLRequest
+func (h URLHandle) ShortenURL(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
 
-	dec := json.NewDecoder(r.Body)
-	if err := dec.Decode(&shortenURL); err != nil {
-		slog.Debug("Decoding is failed", slog.String("Method", r.Method), slog.String("path", r.URL.Path))
+	var req model.ShortenURLRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		slog.Debug("decoding failed",
+			slog.String("method", r.Method),
+			slog.String("path", r.URL.Path),
+		)
 
 		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	recordURL, err := h.service.CreateShortURL(r.Context(), req.URL)
+
+	if err != nil && !errors.Is(err, repository.ErrURLConflict) {
+		slog.Error("ShortenURL", slog.String("error", err.Error()))
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	shortURL, joinErr := url.JoinPath(h.baseURL, recordURL)
+
+	if joinErr != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	response := model.ShortenURLResponse{
+		Result: shortURL,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	status := http.StatusCreated
+
+	if errors.Is(err, repository.ErrURLConflict) {
+		status = http.StatusConflict
+	}
+
+	w.WriteHeader(status)
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		slog.Debug("encoding failed", slog.String("error", err.Error()))
+	}
+}
+
+func (h *URLHandle) Ping(w http.ResponseWriter, r *http.Request) {
+	if err := h.service.Ping(r.Context()); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *URLHandle) Batch(w http.ResponseWriter, r *http.Request) {
+	var requestData []model.ShortenURLBatchRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		slog.Error("Batch, decoding", slog.String("Error", err.Error()))
+		return
+	}
+
+	responseData, err := h.service.Batch(r.Context(), requestData)
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		slog.Error("Batch, saving", slog.String("Error", err.Error()))
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 
-	recordURL, err := h.service.CreateShortURL(shortenURL.URL)
+	for i := range responseData {
+		responseData[i].ShortURL = fmt.Sprintf("%s/%s", h.baseURL, responseData[i].ShortURL)
+	}
 
-	if err != nil {
-		slog.Error("Failed to send short URL", slog.String("Error", err.Error()))
-		http.Error(w, "Failed to send short URL", http.StatusInternalServerError)
+	if err := json.NewEncoder(w).Encode(responseData); err != nil {
+		slog.Error("Batch, sending", slog.String("Error", err.Error()))
 		return
 	}
-
-	shortURL := fmt.Sprintf("%s/%s", h.baseURL, recordURL)
-
-	var response = model.ShortenURLResponse{Result: shortURL}
-
-	enc := json.NewEncoder(w)
-	if err := enc.Encode(response); err != nil {
-		slog.Debug("Encoding is failed", slog.String("Method", r.Method), slog.String("path", r.URL.Path))
-
-		w.WriteHeader(http.StatusInternalServerError)
-	}
-	slog.Debug("HTTP 200")
 }

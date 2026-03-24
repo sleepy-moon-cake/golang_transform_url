@@ -9,7 +9,17 @@ type ShortenURLResponse struct {
 }
 
 type ShortenURLRecord struct {
-	ID          string `json:"uuid"`
+	ID          int    `json:"id"`
 	ShortURL    string `json:"short_url"`
 	OriginalURL string `json:"original_url"`
+}
+
+type ShortenURLBatchRequest struct {
+	CorrelationID string `json:"correlation_id"`
+	OriginalURL   string `json:"original_url"`
+}
+
+type ShortenURLBatchResponse struct {
+	CorrelationID string `json:"correlation_id"`
+	ShortURL      string `json:"short_url"`
 }

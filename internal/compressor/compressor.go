@@ -2,6 +2,7 @@ package compressor
 
 import (
 	"compress/gzip"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -66,7 +67,7 @@ type compressReader struct {
 func newCompressReader(r io.ReadCloser) (*compressReader, error) {
 	zr, err := gzip.NewReader(r)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create gzip reader: %w", err)
 	}
 
 	return &compressReader{
@@ -81,9 +82,14 @@ func (c compressReader) Read(p []byte) (n int, err error) {
 
 func (c *compressReader) Close() error {
 	if err := c.r.Close(); err != nil {
-		return err
+		return fmt.Errorf("close io reader: %w", err)
 	}
-	return c.zr.Close()
+
+	if err := c.zr.Close(); err != nil {
+		return fmt.Errorf("close gzip reader: %w", err)
+	}
+
+	return nil
 }
 
 func Compressor(h http.Handler) http.Handler {

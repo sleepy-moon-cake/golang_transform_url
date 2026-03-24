@@ -2,7 +2,7 @@ package config
 
 import (
 	"flag"
-	"fmt"
+	"log/slog"
 	"os"
 )
 
@@ -11,6 +11,7 @@ type Config struct {
 	BaseURLAddress  string
 	LoggerLevel     string
 	FileStoragePath string
+	DatabaseDSN     string
 }
 
 func GetConfig() *Config {
@@ -20,28 +21,35 @@ func GetConfig() *Config {
 	flag.StringVar(&config.BaseURLAddress, "b", "http://localhost:8080", "base shorted URL")
 	flag.StringVar(&config.LoggerLevel, "l", "info", "log level")
 	flag.StringVar(&config.FileStoragePath, "f", "/storage.json", "path to storage file")
+	flag.StringVar(&config.DatabaseDSN, "d", "", "postgress url")
 
 	flag.Parse()
 
-	if evnServerAddres := os.Getenv("SERVER_ADDRESS"); evnServerAddres != "" {
+	if evnServerAddres, ok := os.LookupEnv("SERVER_ADDRESS"); ok {
 		config.ServerAddress = evnServerAddres
 	}
 
-	if evnBaseURLAddress := os.Getenv("BASE_URL"); evnBaseURLAddress != "" {
+	if evnBaseURLAddress, ok := os.LookupEnv("BASE_URL"); ok {
 		config.BaseURLAddress = evnBaseURLAddress
 	}
 
-	if evnLoggerLevel := os.Getenv("LOG_LEVEL"); evnLoggerLevel != "" {
+	if evnLoggerLevel, ok := os.LookupEnv("LOG_LEVEL"); ok {
 		config.LoggerLevel = evnLoggerLevel
 	}
 
-	if fileStoragePath := os.Getenv("FILE_STORAGE_PATH"); fileStoragePath != "" {
+	if fileStoragePath, ok := os.LookupEnv("FILE_STORAGE_PATH"); ok {
 		config.FileStoragePath = fileStoragePath
 	}
 
-	fmt.Println("Server address:", config.ServerAddress)
-	fmt.Println("Base short URL:", config.BaseURLAddress)
-	fmt.Println("Log level:", config.LoggerLevel)
+	if databaseDSN, ok := os.LookupEnv("DATABASE_DSN"); ok {
+		config.DatabaseDSN = databaseDSN
+	}
+
+	slog.Info("Configurations:::",
+		slog.String("Server address", config.ServerAddress),
+		slog.String("Base short URL", config.BaseURLAddress),
+		slog.String("Log level", config.LoggerLevel),
+	)
 
 	return &config
 }

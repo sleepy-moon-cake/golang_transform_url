@@ -1,30 +1,26 @@
 package service
 
 import (
+	"context"
 	"crypto/rand"
 	"log/slog"
 	"math/big"
 
-	"github.com/google/uuid"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/model"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/repository"
 )
 
-func NewService(path string) *Service {
-	repository := repository.NewRepository(path)
+type Service struct {
+	repository repository.Repository
+}
 
+func NewService(repository repository.Repository) *Service {
 	return &Service{
-		fileStoragePath: path,
-		repository:      repository,
+		repository: repository,
 	}
 }
 
-type Service struct {
-	repository      *repository.Repository
-	fileStoragePath string
-}
-
-func (s *Service) CreateShortURL(str string) (string, error) {
+func (s *Service) CreateShortURL(ctx context.Context, str string) (string, error) {
 	key, err := generateKey()
 
 	if err != nil {
@@ -33,21 +29,20 @@ func (s *Service) CreateShortURL(str string) (string, error) {
 	}
 
 	record := model.ShortenURLRecord{
-		ID:          uuid.NewString(),
 		ShortURL:    key,
 		OriginalURL: str,
 	}
 
-	if err := s.repository.Save(record); err != nil {
+	if record, err := s.repository.Save(ctx, record); err != nil {
 		slog.Error("Save record")
-		return "", err
+		return record.ShortURL, err
 	}
 
 	return key, nil
 }
 
-func (s *Service) GetURLByCode(code string) (string, error) {
-	record, err := s.repository.FindByCode(code)
+func (s *Service) GetURLByCode(ctx context.Context, code string) (string, error) {
+	record, err := s.repository.FindByCode(ctx, code)
 
 	if err != nil {
 		return "", err
@@ -71,4 +66,38 @@ func generateKey() (string, error) {
 	}
 
 	return string(b), nil
+}
+
+func (s *Service) Ping(ctx context.Context) error {
+	return s.repository.Ping(ctx)
+}
+
+func (s *Service) Batch(ctx context.Context, shortURLBatch []model.ShortenURLBatchRequest) ([]model.ShortenURLBatchResponse, error) {
+	shortenURLBatchRequestRecords := make([]model.ShortenURLBatchResponse, 0, len(shortURLBatch))
+	records := make([]model.ShortenURLRecord, 0, len(shortURLBatch))
+
+	for _, url := range shortURLBatch {
+		key, err := generateKey()
+
+		if err != nil {
+			slog.Error("Key generation")
+			return nil, err
+		}
+
+		records = append(records, model.ShortenURLRecord{
+			ShortURL:    key,
+			OriginalURL: url.OriginalURL,
+		})
+
+		shortenURLBatchRequestRecords = append(shortenURLBatchRequestRecords, model.ShortenURLBatchResponse{
+			CorrelationID: url.CorrelationID,
+			ShortURL:      key,
+		})
+	}
+
+	if err := s.repository.Batch(ctx, records); err != nil {
+		return nil, err
+	}
+
+	return shortenURLBatchRequestRecords, nil
 }

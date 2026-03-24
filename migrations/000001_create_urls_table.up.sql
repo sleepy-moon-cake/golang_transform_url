@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS urls (
+    id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+    short_url VARCHAR(255) NOT NULL,
+    original_url TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_urls_short_url ON urls(short_url);
