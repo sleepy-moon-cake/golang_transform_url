@@ -8,6 +8,7 @@ import (
 
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/model"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/repository"
+	"github.com/sleepy-moon-cake/golang_transform_url/internal/shared/contextkeys"
 )
 
 type Service struct {
@@ -28,9 +29,16 @@ func (s *Service) CreateShortURL(ctx context.Context, str string) (string, error
 		return "", err
 	}
 
+	value, ok := ctx.Value(contextkeys.UserId).(string)
+
+	if !ok {
+		return "", contextkeys.ErrContextKey
+	}
+
 	record := model.ShortenURLRecord{
 		ShortURL:    key,
 		OriginalURL: str,
+		UserUUID:    value,
 	}
 
 	if record, err := s.repository.Save(ctx, record); err != nil {
@@ -76,6 +84,12 @@ func (s *Service) Batch(ctx context.Context, shortURLBatch []model.ShortenURLBat
 	shortenURLBatchRequestRecords := make([]model.ShortenURLBatchResponse, 0, len(shortURLBatch))
 	records := make([]model.ShortenURLRecord, 0, len(shortURLBatch))
 
+	value, ok := ctx.Value(contextkeys.UserId).(string)
+
+	if !ok {
+		return nil, contextkeys.ErrContextKey
+	}
+
 	for _, url := range shortURLBatch {
 		key, err := generateKey()
 
@@ -87,6 +101,7 @@ func (s *Service) Batch(ctx context.Context, shortURLBatch []model.ShortenURLBat
 		records = append(records, model.ShortenURLRecord{
 			ShortURL:    key,
 			OriginalURL: url.OriginalURL,
+			UserUUID:    value,
 		})
 
 		shortenURLBatchRequestRecords = append(shortenURLBatchRequestRecords, model.ShortenURLBatchResponse{
@@ -100,4 +115,14 @@ func (s *Service) Batch(ctx context.Context, shortURLBatch []model.ShortenURLBat
 	}
 
 	return shortenURLBatchRequestRecords, nil
+}
+
+func (s *Service) GetUserShortUrls(ctx context.Context) ([]model.ShortenURLRecord, error) {
+	value, ok := ctx.Value(contextkeys.UserId).(string)
+
+	if !ok {
+		return nil, contextkeys.ErrContextKey
+	}
+
+	return s.repository.GetURLsByUserID(ctx, value)
 }

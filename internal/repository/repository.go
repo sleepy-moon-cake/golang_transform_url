@@ -13,6 +13,7 @@ type Repository interface {
 	FindByCode(ctx context.Context, code string) (model.ShortenURLRecord, error)
 	Save(ctx context.Context, record model.ShortenURLRecord) (model.ShortenURLRecord, error)
 	Batch(ctx context.Context, shortenURLRecords []model.ShortenURLRecord) error
+	GetURLsByUserID(ctx context.Context, userID string) ([]model.ShortenURLRecord, error)
 }
 
 func NewRepository(filePath string, db *db.DBSQL) Repository {

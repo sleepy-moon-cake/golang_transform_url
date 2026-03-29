@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -12,12 +13,14 @@ import (
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/model"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/repository"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/service"
+	"github.com/sleepy-moon-cake/golang_transform_url/internal/shared/contextkeys"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 const domainURL = "http://localhost:8080"
 const longURL = "https://practicum.yandex.ru/"
+const userIDKey = "userId"
 
 func TestUrlHandle_CreateshortURL(t *testing.T) {
 	h := newTestHandle(t)
@@ -27,6 +30,10 @@ func TestUrlHandle_CreateshortURL(t *testing.T) {
 		request.Header.Set("Content-Type", "text/plain")
 
 		w := httptest.NewRecorder()
+
+		ctx := context.WithValue(request.Context(), contextkeys.UserId, userIDKey)
+
+		request = request.WithContext(ctx)
 
 		h.CreateShortURL(w, request)
 
@@ -65,7 +72,9 @@ func TestUrlHandle_GetshortURL(t *testing.T) {
 		{
 			name: "get short url - positive",
 			setup: func() (string, error) {
-				return h.service.CreateShortURL(t.Context(), longURL)
+				ctx := context.WithValue(t.Context(), contextkeys.UserId, userIDKey)
+
+				return h.service.CreateShortURL(ctx, longURL)
 			},
 			wantStatus: http.StatusTemporaryRedirect,
 		},
@@ -82,6 +91,10 @@ func TestUrlHandle_GetshortURL(t *testing.T) {
 
 			req := httptest.NewRequest(http.MethodGet, "/"+shortID, nil)
 			w := httptest.NewRecorder()
+
+			ctx := context.WithValue(req.Context(), contextkeys.UserId, userIDKey)
+
+			req = req.WithContext(ctx)
 
 			h.GetShortURL(w, req)
 
@@ -110,6 +123,10 @@ func TestUrlHandle_ShortenURL(t *testing.T) {
 
 		w := httptest.NewRecorder()
 
+		ctx := context.WithValue(request.Context(), contextkeys.UserId, userIDKey)
+
+		request = request.WithContext(ctx)
+
 		h.ShortenURL(w, request)
 
 		result := w.Result()
@@ -131,6 +148,10 @@ func TestUrlHandle_ShortenURL(t *testing.T) {
 	t.Run("API shorten url - invalid json", func(t *testing.T) {
 		request := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(`{invalid json}`))
 		w := httptest.NewRecorder()
+
+		ctx := context.WithValue(request.Context(), contextkeys.UserId, userIDKey)
+
+		request = request.WithContext(ctx)
 
 		h.ShortenURL(w, request)
 
@@ -167,6 +188,10 @@ func TestUrlHandle_Batch(t *testing.T) {
 		request.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
 
+		ctx := context.WithValue(request.Context(), contextkeys.UserId, userIDKey)
+
+		request = request.WithContext(ctx)
+
 		h.Batch(w, request)
 
 		result := w.Result()
@@ -200,6 +225,10 @@ func TestUrlHandle_Batch(t *testing.T) {
 		request.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
 
+		ctx := context.WithValue(request.Context(), contextkeys.UserId, userIDKey)
+
+		request = request.WithContext(ctx)
+
 		h.Batch(w, request)
 
 		assert.Equal(t, http.StatusCreated, w.Code)
@@ -210,6 +239,10 @@ func TestUrlHandle_Batch(t *testing.T) {
 		// Присылаем объект вместо массива
 		request := httptest.NewRequest(http.MethodPost, "/api/shorten/batch", strings.NewReader(`{"id": "not a batch"}`))
 		w := httptest.NewRecorder()
+
+		ctx := context.WithValue(request.Context(), contextkeys.UserId, userIDKey)
+
+		request = request.WithContext(ctx)
 
 		h.Batch(w, request)
 

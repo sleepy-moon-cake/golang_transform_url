@@ -178,3 +178,7 @@ func (h *URLHandle) Batch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
+
+func (h *URLHandle) GetUserShortUrls(w http.ResponseWriter, r *http.Request) {
+
+}
