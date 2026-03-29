@@ -63,7 +63,7 @@ func JWTSession(cfg *SessionConfig) func(http.Handler) http.Handler {
 }
 
 func buildJWTString(userId string, secretKey string, expire time.Duration) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodES256, Claims{
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, Claims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expire)),
 		},
