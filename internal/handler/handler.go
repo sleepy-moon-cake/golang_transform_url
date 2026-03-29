@@ -13,6 +13,7 @@ import (
 
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/model"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/repository"
+	"github.com/sleepy-moon-cake/golang_transform_url/internal/shared/contextkeys"
 )
 
 type URLHandle struct {
@@ -25,6 +26,7 @@ type URLService interface {
 	GetURLByCode(ctx context.Context, code string) (string, error)
 	Ping(ctx context.Context) error
 	Batch(ctx context.Context, shorURLBatch []model.ShortenURLBatchRequest) ([]model.ShortenURLBatchResponse, error)
+	GetUserShortUrls(ctx context.Context) ([]model.ShortenURLRecord, error)
 }
 
 func NewURLHandler(baseURL string, service URLService) *URLHandle {
@@ -180,5 +182,33 @@ func (h *URLHandle) Batch(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *URLHandle) GetUserShortUrls(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(contextkeys.UserId).(string)
 
+	if !ok || userID == "" {
+		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
+
+	records, err := h.service.GetUserShortUrls(r.Context())
+	
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	if len(records) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	for i := range records {
+		records[i].ShortURL = fmt.Sprintf("%s/%s", h.baseURL, records[i].ShortURL)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	if err := json.NewEncoder(w).Encode(records); err != nil {
+		slog.Error("GetUserShortUrls", slog.String("error", err.Error()))
+	}
 }
