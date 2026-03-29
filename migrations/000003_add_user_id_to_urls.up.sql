@@ -1,3 +1,3 @@
-DROP INDEX IF EXISTS idx_urls_user_id;
+ALTER TABLE urls ADD COLUMN user_id TEXT;
 
-ALTER TABLE urls DROP COLUMN user_id;
+CREATE INDEX idx_urls_user_id ON urls(user_id);
