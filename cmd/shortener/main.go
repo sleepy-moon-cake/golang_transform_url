@@ -80,5 +80,7 @@ func createRouter(handler *handler.URLHandle) http.Handler {
 
 	r.Get("/api/user/urls", handler.GetUserShortUrls)
 
+	r.Delete("/api/user/urls", handler.DeleteBatch)
+
 	return r
 }

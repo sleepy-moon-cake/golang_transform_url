@@ -142,3 +142,7 @@ func (r *FileRepository) GetURLsByUserID(ctx context.Context, userID string) ([]
 
 	return userRecords, nil
 }
+
+func (r *FileRepository) DeleteBatch(ctx context.Context, url []model.ShortenUrlDeleteRecord) error {
+	return errors.New("not support for filestorage, pls use datastorage")
+}

@@ -13,6 +13,7 @@ import (
 
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/model"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/repository"
+	"github.com/sleepy-moon-cake/golang_transform_url/internal/service"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/shared/contextkeys"
 )
 
@@ -27,6 +28,7 @@ type URLService interface {
 	Ping(ctx context.Context) error
 	Batch(ctx context.Context, shorURLBatch []model.ShortenURLBatchRequest) ([]model.ShortenURLBatchResponse, error)
 	GetUserShortUrls(ctx context.Context) ([]model.ShortenURLRecord, error)
+	DeleteBatchUrl(ctx context.Context, shotUrls []string) error
 }
 
 func NewURLHandler(baseURL string, service URLService) *URLHandle {
@@ -86,6 +88,11 @@ func (h URLHandle) GetShortURL(w http.ResponseWriter, r *http.Request) {
 	slog.Info("GetShortURL", slog.String("URL-SHORT", shortURL), slog.String("URL-ORIGIN", originalURL))
 
 	if err != nil {
+		if errors.Is(err, service.ErrURLBeenDeleted) {
+			http.Error(w, http.StatusText(http.StatusGone), http.StatusGone)
+			return
+		}
+
 		http.Error(w, "", http.StatusBadRequest)
 		return
 	}
@@ -190,7 +197,7 @@ func (h *URLHandle) GetUserShortUrls(w http.ResponseWriter, r *http.Request) {
 	}
 
 	records, err := h.service.GetUserShortUrls(r.Context())
-	
+
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
@@ -211,4 +218,20 @@ func (h *URLHandle) GetUserShortUrls(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(records); err != nil {
 		slog.Error("GetUserShortUrls", slog.String("error", err.Error()))
 	}
+}
+
+func (h *URLHandle) DeleteBatch(w http.ResponseWriter, r *http.Request) {
+	var URLs = make([]string, 0)
+
+	if err := json.NewDecoder(r.Body).Decode(&URLs); err != nil {
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+
+	if err := h.service.DeleteBatchUrl(r.Context(), URLs); err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusAccepted)
 }

@@ -3,21 +3,27 @@ package service
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"log/slog"
 	"math/big"
+	"time"
 
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/model"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/repository"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/shared/contextkeys"
 )
 
+var ErrURLBeenDeleted = errors.New("record was deleted")
+
 type Service struct {
-	repository repository.Repository
+	repository        repository.Repository
+	deleteUrlsChannel chan []model.ShortenUrlDeleteRecord
 }
 
 func NewService(repository repository.Repository) *Service {
 	return &Service{
-		repository: repository,
+		repository:        repository,
+		deleteUrlsChannel: make(chan []model.ShortenUrlDeleteRecord, 1024),
 	}
 }
 
@@ -54,6 +60,10 @@ func (s *Service) GetURLByCode(ctx context.Context, code string) (string, error)
 
 	if err != nil {
 		return "", err
+	}
+
+	if record.DeletedFlag {
+		return "", ErrURLBeenDeleted
 	}
 
 	return record.OriginalURL, nil
@@ -125,4 +135,59 @@ func (s *Service) GetUserShortUrls(ctx context.Context) ([]model.ShortenURLRecor
 	}
 
 	return s.repository.GetURLsByUserID(ctx, value)
+}
+
+func (s *Service) DeleteBatchUrl(ctx context.Context, shotUrls []string) error {
+	userUUID, ok := ctx.Value(contextkeys.UserId).(string)
+
+	if !ok {
+		return contextkeys.ErrContextKey
+	}
+
+	urls := make([]model.ShortenUrlDeleteRecord, 0, len(shotUrls))
+
+	for _, url := range shotUrls {
+		urls = append(urls, model.ShortenUrlDeleteRecord{ShortURL: url, UserUUID: userUUID})
+	}
+
+	s.deleteUrlsChannel <- urls
+
+	return nil
+}
+
+func (s *Service) newDeleteWorker() {
+	deleteTimer := time.NewTicker(5 * time.Second)
+	defer deleteTimer.Stop()
+
+	deleteUrls := make([]model.ShortenUrlDeleteRecord, 0)
+
+	ctx := context.Background()
+
+	for {
+		select {
+		case urls, ok := <-s.deleteUrlsChannel:
+			if !ok {
+				if len(deleteUrls) > 0 {
+					s.repository.DeleteBatch(ctx, deleteUrls)
+				}
+				return
+			}
+
+			deleteUrls = append(deleteUrls, urls...)
+
+			if len(deleteUrls) > 100 {
+				s.repository.DeleteBatch(ctx, deleteUrls)
+				deleteUrls = deleteUrls[:0]
+				deleteTimer.Reset(5 * time.Second)
+			}
+
+		case <-deleteTimer.C:
+			if len(deleteUrls) == 0 {
+				continue
+			}
+
+			s.repository.DeleteBatch(ctx, deleteUrls)
+			deleteUrls = deleteUrls[:0]
+		}
+	}
 }

@@ -141,3 +141,33 @@ func (r *SQLRepository) GetURLsByUserID(ctx context.Context, userID string) ([]m
 
 	return records, nil
 }
+
+func (r *SQLRepository) DeleteBatch(ctx context.Context, urls []model.ShortenUrlDeleteRecord) error {
+	if len(urls) == 0 {
+		return nil
+	}
+
+	values := make([]string, 0, len(urls))
+	args := make([]any, 0, len(urls)*2)
+
+	for i, v := range urls {
+		// Формируем ($1, $2), ($3, $4)...
+		values = append(values, fmt.Sprintf("($%d, $%d)", i*2+1, i*2+2))
+		args = append(args, v.ShortURL, v.UserUUID)
+	}
+
+	query := fmt.Sprintf(`
+		UPDATE urls AS u
+		SET is_deleted = true
+		FROM (VALUES %s) AS d(short_url, user_id)
+		WHERE u.short_url = d.short_url AND u.user_id = d.user_id`,
+		strings.Join(values, ","),
+	)
+
+	_, err := r.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return fmt.Errorf("database delete batch: %w", err)
+	}
+
+	return nil
+}
