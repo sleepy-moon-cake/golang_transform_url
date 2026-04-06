@@ -160,7 +160,7 @@ func (s *Service) DeleteBatchUrl(ctx context.Context, shotUrls []string) error {
 }
 
 func (s *Service) newDeleteWorker() {
-	deleteTimer := time.NewTicker(5 * time.Second)
+	deleteTimer := time.NewTicker(300 * time.Millisecond)
 	defer deleteTimer.Stop()
 
 	deleteUrls := make([]model.ShortenUrlDeleteRecord, 0)
@@ -179,10 +179,10 @@ func (s *Service) newDeleteWorker() {
 
 			deleteUrls = append(deleteUrls, urls...)
 
-			if len(deleteUrls) > 100 {
+			if len(deleteUrls) > 5 {
 				s.repository.DeleteBatch(ctx, deleteUrls)
 				deleteUrls = deleteUrls[:0]
-				deleteTimer.Reset(5 * time.Second)
+				deleteTimer.Reset(300 * time.Millisecond)
 			}
 
 		case <-deleteTimer.C:
