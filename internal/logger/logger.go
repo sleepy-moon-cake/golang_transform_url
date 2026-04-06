@@ -57,12 +57,10 @@ func Logger(h http.Handler) http.Handler {
 
 		duration := time.Since(start)
 
-		slog.Info("Incoming request",
+		slog.Info("Request-Response",
 			slog.String("method", req.Method),
 			slog.String("path", req.URL.Path),
-			slog.Duration("duration", duration))
-
-		slog.Info("Response",
+			slog.Duration("duration", duration),
 			slog.Int("status", loggerData.status),
 			slog.Int("size", loggerData.size))
 

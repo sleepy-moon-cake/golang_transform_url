@@ -21,10 +21,14 @@ type Service struct {
 }
 
 func NewService(repository repository.Repository) *Service {
-	return &Service{
+	instance := &Service{
 		repository:        repository,
 		deleteUrlsChannel: make(chan []model.ShortenUrlDeleteRecord, 1024),
 	}
+
+	go instance.newDeleteWorker()
+
+	return instance
 }
 
 func (s *Service) CreateShortURL(ctx context.Context, str string) (string, error) {
