@@ -68,9 +68,9 @@ func (r *SQLRepository) FindByCode(ctx context.Context, code string) (model.Shor
 
 	err := r.db.QueryRowContext(
 		ctx,
-		"SELECT original_url, short_url FROM urls WHERE short_url = $1",
+		"SELECT original_url, short_url, is_deleted  FROM urls WHERE short_url = $1",
 		code,
-	).Scan(&record.OriginalURL, &record.ShortURL)
+	).Scan(&record.OriginalURL, &record.ShortURL, &record.DeletedFlag)
 
 	if err != nil {
 		return model.ShortenURLRecord{}, fmt.Errorf("database findByCode: %w", err)

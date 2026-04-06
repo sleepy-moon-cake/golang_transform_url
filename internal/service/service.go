@@ -172,7 +172,14 @@ func (s *Service) newDeleteWorker() {
 		case urls, ok := <-s.deleteUrlsChannel:
 			if !ok {
 				if len(deleteUrls) > 0 {
-					s.repository.DeleteBatch(ctx, deleteUrls)
+					err := s.repository.DeleteBatch(ctx, deleteUrls)
+					if err != nil {
+						slog.Error("failed to delete batch in worker",
+							slog.String("error", err.Error()),
+							slog.Int("count", len(deleteUrls)),
+						)
+					}
+
 				}
 				return
 			}
@@ -180,7 +187,13 @@ func (s *Service) newDeleteWorker() {
 			deleteUrls = append(deleteUrls, urls...)
 
 			if len(deleteUrls) > 5 {
-				s.repository.DeleteBatch(ctx, deleteUrls)
+				err := s.repository.DeleteBatch(ctx, deleteUrls)
+				if err != nil {
+					slog.Error("failed to delete batch in worker",
+						slog.String("error", err.Error()),
+						slog.Int("count", len(deleteUrls)),
+					)
+				}
 				deleteUrls = deleteUrls[:0]
 				deleteTimer.Reset(300 * time.Millisecond)
 			}
@@ -190,7 +203,13 @@ func (s *Service) newDeleteWorker() {
 				continue
 			}
 
-			s.repository.DeleteBatch(ctx, deleteUrls)
+			err := s.repository.DeleteBatch(ctx, deleteUrls)
+			if err != nil {
+				slog.Error("failed to delete batch in worker",
+					slog.String("error", err.Error()),
+					slog.Int("count", len(deleteUrls)),
+				)
+			}
 			deleteUrls = deleteUrls[:0]
 		}
 	}
