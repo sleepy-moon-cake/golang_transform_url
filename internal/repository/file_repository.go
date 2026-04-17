@@ -108,3 +108,41 @@ func (r *FileRepository) Batch(ctx context.Context, shortenURLRecords []model.Sh
 
 	return nil
 }
+
+func (r *FileRepository) GetURLsByUserID(ctx context.Context, userID string) ([]model.ShortenURLRecord, error) {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+
+	file, err := os.Open(r.fileStoragePath)
+	if err != nil {
+		return nil, err
+	}
+
+	defer file.Close()
+
+	decoder := json.NewDecoder(file)
+
+	var userRecords []model.ShortenURLRecord
+
+	for {
+		var record model.ShortenURLRecord
+
+		err := decoder.Decode(&record)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return nil, err
+		}
+
+		if record.UserUUID == userID {
+			userRecords = append(userRecords, record)
+		}
+	}
+
+	return userRecords, nil
+}
+
+func (r *FileRepository) DeleteBatch(ctx context.Context, url []model.ShortenUrlDeleteRecord) error {
+	return errors.New("not support for filestorage, pls use datastorage")
+}

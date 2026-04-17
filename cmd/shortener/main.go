@@ -17,6 +17,7 @@ import (
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/logger"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/repository"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/service"
+	"github.com/sleepy-moon-cake/golang_transform_url/internal/session"
 )
 
 func main() {
@@ -58,6 +59,11 @@ func listenAndServe(cng *config.Config, db *db.DBSQL) error {
 
 func createRouter(handler *handler.URLHandle) http.Handler {
 	r := chi.NewRouter()
+	r.Use(session.JWTSession(&session.SessionConfig{
+		Name:      "Session",
+		SecretKey: "SecretKey",
+		ExpiresAt: 3 * time.Hour,
+	}))
 	r.Use(logger.Logger)
 	r.Use(compressor.Compressor)
 
@@ -71,6 +77,10 @@ func createRouter(handler *handler.URLHandle) http.Handler {
 	})
 
 	r.Get("/ping", handler.Ping)
+
+	r.Get("/api/user/urls", handler.GetUserShortUrls)
+
+	r.Delete("/api/user/urls", handler.DeleteBatch)
 
 	return r
 }
