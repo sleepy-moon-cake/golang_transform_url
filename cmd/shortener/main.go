@@ -18,6 +18,7 @@ import (
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/repository"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/service"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/session"
+	"github.com/sleepy-moon-cake/golang_transform_url/internal/shared/audit"
 )
 
 func main() {
@@ -42,22 +43,24 @@ func main() {
 
 	logger.Init(cfg.LoggerLevel)
 
-	if err := listenAndServe(cfg, database); err != nil {
+	if err := listenAndServe(ctx, cfg, database); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func listenAndServe(cng *config.Config, db *db.DBSQL) error {
+func listenAndServe(ctx context.Context, cng *config.Config, db *db.DBSQL) error {
 	repository := repository.NewRepository(cng.FileStoragePath, db)
 	service := service.NewService(repository)
 	handler := handler.NewURLHandler(cng.BaseURLAddress, service)
 
-	router := createRouter(handler)
+	router := createRouter(ctx, cng, handler)
 
 	return http.ListenAndServe(cng.ServerAddress, router)
 }
 
-func createRouter(handler *handler.URLHandle) http.Handler {
+func createRouter(ctx context.Context, cfg *config.Config, handler *handler.URLHandle) http.Handler {
+	auditMW := audit.NewAuditMiddleware(ctx, &audit.AuditConfig{URL: cfg.AuditURL, Path: cfg.AuditFile})
+
 	r := chi.NewRouter()
 	r.Use(session.JWTSession(&session.SessionConfig{
 		Name:      "Session",
@@ -68,11 +71,12 @@ func createRouter(handler *handler.URLHandle) http.Handler {
 	r.Use(compressor.Compressor)
 
 	r.Route("/", func(r chi.Router) {
-		r.Get("/{shortURL}", handler.GetShortURL)
-		r.Post("/", handler.CreateShortURL)
+		r.With(auditMW).Get("/{shortURL}", handler.GetShortURL)
+		r.With(auditMW).Post("/", handler.CreateShortURL)
 	})
+
 	r.Route("/api", func(r chi.Router) {
-		r.Post("/shorten", handler.ShortenURL)
+		r.With(auditMW).Post("/shorten", handler.ShortenURL)
 		r.Post("/shorten/batch", handler.Batch)
 	})
 
