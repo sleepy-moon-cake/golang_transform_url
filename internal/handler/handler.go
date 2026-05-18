@@ -1,3 +1,5 @@
+// Package handler предоставляет HTTP-хендлеры для маршрутизации,
+// валидации и обработки входящих запросов сервиса сокращения URL.
 package handler
 
 import (
@@ -17,24 +19,38 @@ import (
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/shared/contextkeys"
 )
 
+// URLHandle управляет HTTP-запросами, хранит базовый адрес сервера
+// для генерации ссылок и интерфейс бизнес-логики.
 type URLHandle struct {
 	baseURL string
 	service URLService
 }
 
+// URLService описывает контракт для работы с бизнес-логикой сокращения,
+// хранения, пакетной обработки, удаления и извлечения URL-адресов.
 type URLService interface {
+	// CreateShortURL генерирует уникальный короткий идентификатор для оригинальной ссылки.
 	CreateShortURL(ctx context.Context, str string) (string, error)
+	// GetURLByCode извлекает оригинальный длинный URL по его сокращенному коду.
 	GetURLByCode(ctx context.Context, code string) (string, error)
+	// Ping выполняет проверку связи с используемым хранилищем данных.
 	Ping(ctx context.Context) error
+	// Batch выполняет массовое создание сокращенных кодов для пакета ссылок.
 	Batch(ctx context.Context, shorURLBatch []model.ShortenURLBatchRequest) ([]model.ShortenURLBatchResponse, error)
+	// GetUserShortUrls возвращает список всех созданных ссылок конкретного пользователя.
 	GetUserShortUrls(ctx context.Context) ([]model.ShortenURLRecord, error)
+	// DeleteBatchUrl ставит в очередь асинхронного воркера пакет кодов на удаление.
 	DeleteBatchUrl(ctx context.Context, shotUrls []string) error
 }
 
+// NewURLHandler выполняет инициализацию и возвращает новый указатель на структуру URLHandle.
 func NewURLHandler(baseURL string, service URLService) *URLHandle {
 	return &URLHandle{baseURL: baseURL, service: service}
 }
 
+// CreateShortURL обрабатывает POST-запросы со строкой в формате "text/plain".
+// Возвращает статус 201 Created и сокращенную ссылку в теле ответа.
+// Если URL уже существует в базе, возвращает статус 409 Conflict.
 func (h URLHandle) CreateShortURL(w http.ResponseWriter, r *http.Request) {
 	if !strings.HasPrefix(r.Header.Get("Content-Type"), "text/plain") {
 		http.Error(w, "", http.StatusBadRequest)
@@ -76,6 +92,9 @@ func (h URLHandle) CreateShortURL(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(shortURL))
 }
 
+// GetShortURL обрабатывает GET-запросы с коротким кодом в пути.
+// Выполняет перенаправление 307 Temporary Redirect на оригинальный URL-адрес.
+// Если ссылка была ранее удалена воркером, возвращает HTTP-статус 410 Gone.
 func (h URLHandle) GetShortURL(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/" {
 		http.Error(w, "", http.StatusBadRequest)
@@ -101,6 +120,9 @@ func (h URLHandle) GetShortURL(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
+// ShortenURL обрабатывает POST-запросы к API, принимая JSON вида {"url": "..."}.
+// Возвращает ответ со статусом 201 Created и JSON-телом {"result": "..."}.
+// При конфликте уникальности возвращает статус 409 Conflict.
 func (h URLHandle) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
@@ -150,6 +172,8 @@ func (h URLHandle) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Ping проверяет работоспособность и доступность текущего хранилища данных.
+// Возвращает статус 200 OK при успехе и 500 Internal Server Error при недоступности.
 func (h *URLHandle) Ping(w http.ResponseWriter, r *http.Request) {
 	if err := h.service.Ping(r.Context()); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -158,6 +182,8 @@ func (h *URLHandle) Ping(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// Batch принимает JSON-массив с набором ссылок для их одновременного пакетного сокращения.
+// Возвращает массив с correlation_id и сгенерированными короткими ссылками со статусом 201.
 func (h *URLHandle) Batch(w http.ResponseWriter, r *http.Request) {
 	var requestData []model.ShortenURLBatchRequest
 
@@ -188,6 +214,9 @@ func (h *URLHandle) Batch(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// GetUserShortUrls возвращает JSON-массив всех сокращенных URL, принадлежащих
+// авторизованному пользователю (UUID извлекается из контекста).
+// Если у пользователя нет сохраненных ссылок, возвращает статус 204 No Content.
 func (h *URLHandle) GetUserShortUrls(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(contextkeys.UserId).(string)
 
@@ -220,6 +249,9 @@ func (h *URLHandle) GetUserShortUrls(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// DeleteBatch принимает JSON-массив коротких кодов для их каскадного удаления.
+// Не выполняет блокирующее удаление сразу, а возвращает статус 202 Accepted
+// и отправляет данные в конкурентный канал неблокирующего фонового воркера.
 func (h *URLHandle) DeleteBatch(w http.ResponseWriter, r *http.Request) {
 	var URLs = make([]string, 0)
 
