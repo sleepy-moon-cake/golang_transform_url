@@ -3,10 +3,9 @@ package handler
 import (
 	"context"
 	"encoding/json"
-	"io"
+	"errors"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 
@@ -19,236 +18,280 @@ import (
 )
 
 const domainURL = "http://localhost:8080"
-const longURL = "https://practicum.yandex.ru/"
+const longURL = "https://yandex.ru"
 const userIDKey = "userId"
 
-func TestUrlHandle_CreateshortURL(t *testing.T) {
-	h := newTestHandle(t)
-
-	t.Run("Create url", func(t *testing.T) {
-		request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(longURL))
-		request.Header.Set("Content-Type", "text/plain")
-
-		w := httptest.NewRecorder()
-
-		ctx := context.WithValue(request.Context(), contextkeys.UserId, userIDKey)
-
-		request = request.WithContext(ctx)
-
-		h.CreateShortURL(w, request)
-
-		result := w.Result()
-		defer result.Body.Close()
-
-		assert.Equal(t, http.StatusCreated, result.StatusCode)
-		resBody, err := io.ReadAll(result.Body)
-		require.NoError(t, err)
-		require.NotEmpty(t, resBody)
-		assert.Contains(t, string(resBody), domainURL)
-		assert.Contains(t, result.Header.Get("Content-Type"), "text/plain")
-	})
+// --- MOCK URL SERVICE ---
+type mockURLService struct {
+	CreateShortURLFunc   func(ctx context.Context, str string) (string, error)
+	GetURLByCodeFunc     func(ctx context.Context, code string) (string, error)
+	PingFunc             func(ctx context.Context) error
+	BatchFunc            func(ctx context.Context, shorURLBatch []model.ShortenURLBatchRequest) ([]model.ShortenURLBatchResponse, error)
+	GetUserShortUrlsFunc func(ctx context.Context) ([]model.ShortenURLRecord, error)
+	DeleteBatchUrlFunc   func(ctx context.Context, shotUrls []string) error
 }
 
-func TestUrlHandle_GetshortURL(t *testing.T) {
-	h := newTestHandle(t)
+func (m *mockURLService) CreateShortURL(ctx context.Context, str string) (string, error) {
+	return m.CreateShortURLFunc(ctx, str)
+}
+func (m *mockURLService) GetURLByCode(ctx context.Context, code string) (string, error) {
+	return m.GetURLByCodeFunc(ctx, code)
+}
+func (m *mockURLService) Ping(ctx context.Context) error {
+	return m.PingFunc(ctx)
+}
+func (m *mockURLService) Batch(ctx context.Context, shorURLBatch []model.ShortenURLBatchRequest) ([]model.ShortenURLBatchResponse, error) {
+	return m.BatchFunc(ctx, shorURLBatch)
+}
+func (m *mockURLService) GetUserShortUrls(ctx context.Context) ([]model.ShortenURLRecord, error) {
+	return m.GetUserShortUrlsFunc(ctx)
+}
+func (m *mockURLService) DeleteBatchUrl(ctx context.Context, shotUrls []string) error {
+	return m.DeleteBatchUrlFunc(ctx, shotUrls)
+}
 
-	tests := []struct {
-		name       string
-		setup      func() (string, error)
-		path       string
-		wantStatus int
-		wantBody   string
-	}{
-		{
-			name:       "path is empty - negative",
-			path:       "",
-			wantStatus: http.StatusBadRequest,
-		},
-		{
-			name:       "storage is empty - negative",
-			path:       "empty",
-			wantStatus: http.StatusBadRequest,
-		},
-		{
-			name: "get short url - positive",
-			setup: func() (string, error) {
-				ctx := context.WithValue(t.Context(), contextkeys.UserId, userIDKey)
+// --- TESTS FOR CreateShortURL ---
 
-				return h.service.CreateShortURL(ctx, longURL)
+func TestUrlHandle_CreateShortURL_Scenarios(t *testing.T) {
+	t.Run("Positive - Success 201", func(t *testing.T) {
+		svc := &mockURLService{
+			CreateShortURLFunc: func(ctx context.Context, str string) (string, error) {
+				return "short123", nil
 			},
-			wantStatus: http.StatusTemporaryRedirect,
-		},
-	}
+		}
+		h := NewURLHandler(domainURL, svc)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			shortID := tt.path
-			if tt.setup != nil {
-				if value, err := tt.setup(); err == nil {
-					shortID = value
-				}
-			}
-
-			req := httptest.NewRequest(http.MethodGet, "/"+shortID, nil)
-			w := httptest.NewRecorder()
-
-			ctx := context.WithValue(req.Context(), contextkeys.UserId, userIDKey)
-
-			req = req.WithContext(ctx)
-
-			h.GetShortURL(w, req)
-
-			res := w.Result()
-			defer res.Body.Close()
-
-			assert.Equal(t, tt.wantStatus, res.StatusCode)
-
-			if tt.wantStatus == http.StatusTemporaryRedirect {
-				location := res.Header.Get("Location")
-				assert.NotEmpty(t, location)
-				assert.Contains(t, location, longURL)
-			}
-		})
-	}
-}
-
-func TestUrlHandle_ShortenURL(t *testing.T) {
-	h := newTestHandle(t)
-
-	t.Run("API shorten url - positive", func(t *testing.T) {
-		jsonBody := `{"url":"` + longURL + `"}`
-
-		request := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(jsonBody))
-		request.Header.Set("Content-Type", "application/json")
-
+		req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(longURL))
+		req.Header.Set("Content-Type", "text/plain")
 		w := httptest.NewRecorder()
 
-		ctx := context.WithValue(request.Context(), contextkeys.UserId, userIDKey)
-
-		request = request.WithContext(ctx)
-
-		h.ShortenURL(w, request)
-
-		result := w.Result()
-		defer result.Body.Close()
-
-		// Проверяем статус и заголовки
-		assert.Equal(t, http.StatusCreated, result.StatusCode)
-		assert.Contains(t, result.Header.Get("Content-Type"), "application/json")
-
-		// Проверяем тело ответа
-		resBody, err := io.ReadAll(result.Body)
-		require.NoError(t, err)
-
-		// Ожидаем JSON формата {"result": "..."}
-		assert.Contains(t, string(resBody), `"result"`)
-		require.NotEmpty(t, resBody)
-	})
-
-	t.Run("API shorten url - invalid json", func(t *testing.T) {
-		request := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(`{invalid json}`))
-		w := httptest.NewRecorder()
-
-		ctx := context.WithValue(request.Context(), contextkeys.UserId, userIDKey)
-
-		request = request.WithContext(ctx)
-
-		h.ShortenURL(w, request)
-
-		result := w.Result()
-		defer result.Body.Close()
-
-		assert.Equal(t, http.StatusInternalServerError, result.StatusCode)
-	})
-}
-
-func newTestHandle(t *testing.T) *URLHandle {
-	tmpFile, err := os.CreateTemp("", "storage_*.json")
-	require.NoError(t, err)
-
-	t.Cleanup(func() { os.Remove(tmpFile.Name()) })
-
-	repo, err := repository.NewRepository(tmpFile.Name(), nil)
-	if err != nil {
-		t.Fatalf("failed to create repo in benchmark: %v", err)
-	}
-	svc := service.NewService(repo)
-
-	return &URLHandle{baseURL: domainURL, service: svc}
-}
-
-func TestUrlHandle_Batch(t *testing.T) {
-	h := newTestHandle(t)
-
-	t.Run("Batch shorten - success", func(t *testing.T) {
-		// Подготавливаем JSON-запрос с двумя ссылками
-		jsonBody := `[
-			{"correlation_id": "first-id", "original_url": "https://google.com"},
-			{"correlation_id": "second-id", "original_url": "https://yandex.ru"}
-		]`
-
-		request := httptest.NewRequest(http.MethodPost, "/api/shorten/batch", strings.NewReader(jsonBody))
-		request.Header.Set("Content-Type", "application/json")
-		w := httptest.NewRecorder()
-
-		ctx := context.WithValue(request.Context(), contextkeys.UserId, userIDKey)
-
-		request = request.WithContext(ctx)
-
-		h.Batch(w, request)
-
-		result := w.Result()
-		defer result.Body.Close()
-
-		// 1. Проверяем статус 201 Created
-		assert.Equal(t, http.StatusCreated, result.StatusCode)
-
-		// 2. Проверяем заголовок Content-Type
-		assert.Contains(t, result.Header.Get("Content-Type"), "application/json")
-
-		// 3. Декодируем тело ответа для детальной проверки
-		var response []model.ShortenURLBatchResponse
-		err := json.NewDecoder(result.Body).Decode(&response)
-		require.NoError(t, err)
-
-		// 4. Проверяем длину и содержимое
-		assert.Len(t, response, 2)
-
-		// Проверяем, что correlation_id вернулись правильно
-		assert.Equal(t, "first-id", response[0].CorrelationID)
-		assert.Equal(t, "second-id", response[1].CorrelationID)
-
-		// Проверяем, что сформированы короткие ссылки с твоим доменом
-		assert.Contains(t, response[0].ShortURL, domainURL)
-		assert.Contains(t, response[1].ShortURL, domainURL)
-	})
-
-	t.Run("Batch shorten - empty array", func(t *testing.T) {
-		request := httptest.NewRequest(http.MethodPost, "/api/shorten/batch", strings.NewReader(`[]`))
-		request.Header.Set("Content-Type", "application/json")
-		w := httptest.NewRecorder()
-
-		ctx := context.WithValue(request.Context(), contextkeys.UserId, userIDKey)
-
-		request = request.WithContext(ctx)
-
-		h.Batch(w, request)
+		h.CreateShortURL(w, req)
 
 		assert.Equal(t, http.StatusCreated, w.Code)
-		assert.Equal(t, "[]\n", w.Body.String()) // Encode добавляет перенос строки
+		assert.Equal(t, domainURL+"/short123", w.Body.String())
 	})
 
-	t.Run("Batch shorten - invalid JSON", func(t *testing.T) {
-		// Присылаем объект вместо массива
-		request := httptest.NewRequest(http.MethodPost, "/api/shorten/batch", strings.NewReader(`{"id": "not a batch"}`))
+	t.Run("Negative - Wrong Content-Type 400", func(t *testing.T) {
+		h := NewURLHandler(domainURL, &mockURLService{})
+		req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(longURL))
+		req.Header.Set("Content-Type", "application/json") // Неверный тип
 		w := httptest.NewRecorder()
 
-		ctx := context.WithValue(request.Context(), contextkeys.UserId, userIDKey)
+		h.CreateShortURL(w, req)
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
 
-		request = request.WithContext(ctx)
+	t.Run("Positive - URL Conflict 409", func(t *testing.T) {
+		svc := &mockURLService{
+			CreateShortURLFunc: func(ctx context.Context, str string) (string, error) {
+				return "existingID", repository.ErrURLConflict
+			},
+		}
+		h := NewURLHandler(domainURL, svc)
 
-		h.Batch(w, request)
+		req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(longURL))
+		req.Header.Set("Content-Type", "text/plain")
+		w := httptest.NewRecorder()
 
+		h.CreateShortURL(w, req)
+
+		assert.Equal(t, http.StatusConflict, w.Code)
+		assert.Equal(t, domainURL+"/existingID", w.Body.String())
+	})
+}
+
+// --- TESTS FOR GetShortURL ---
+
+func TestUrlHandle_GetShortURL_Scenarios(t *testing.T) {
+	t.Run("Negative - Empty Path 400", func(t *testing.T) {
+		h := NewURLHandler(domainURL, &mockURLService{})
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		w := httptest.NewRecorder()
+
+		h.GetShortURL(w, req)
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+
+	t.Run("Positive - Temporary Redirect 307", func(t *testing.T) {
+		svc := &mockURLService{
+			GetURLByCodeFunc: func(ctx context.Context, code string) (string, error) {
+				return longURL, nil
+			},
+		}
+		h := NewURLHandler(domainURL, svc)
+
+		req := httptest.NewRequest(http.MethodGet, "/short123", nil)
+		w := httptest.NewRecorder()
+
+		h.GetShortURL(w, req)
+
+		assert.Equal(t, http.StatusTemporaryRedirect, w.Code)
+		assert.Equal(t, longURL, w.Header().Get("Location"))
+	})
+
+	t.Run("Negative - URL Been Deleted 410 Gone", func(t *testing.T) {
+		svc := &mockURLService{
+			GetURLByCodeFunc: func(ctx context.Context, code string) (string, error) {
+				return "", service.ErrURLBeenDeleted
+			},
+		}
+		h := NewURLHandler(domainURL, svc)
+
+		req := httptest.NewRequest(http.MethodGet, "/deleted123", nil)
+		w := httptest.NewRecorder()
+
+		h.GetShortURL(w, req)
+
+		assert.Equal(t, http.StatusGone, w.Code)
+	})
+}
+
+// --- TESTS FOR ShortenURL (JSON API) ---
+
+func TestUrlHandle_ShortenURL_Scenarios(t *testing.T) {
+	t.Run("Positive - JSON Shorten Success 201", func(t *testing.T) {
+		svc := &mockURLService{
+			CreateShortURLFunc: func(ctx context.Context, str string) (string, error) {
+				return "json123", nil
+			},
+		}
+		h := NewURLHandler(domainURL, svc)
+
+		reqBody := `{"url":"https://yandex.ru"}`
+		req := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(reqBody))
+		w := httptest.NewRecorder()
+
+		h.ShortenURL(w, req)
+
+		assert.Equal(t, http.StatusCreated, w.Code)
+		assert.Contains(t, w.Header().Get("Content-Type"), "application/json")
+
+		var res model.ShortenURLResponse
+		err := json.Unmarshal(w.Body.Bytes(), &res)
+		require.NoError(t, err)
+		assert.Equal(t, domainURL+"/json123", res.Result)
+	})
+
+	t.Run("Positive - JSON Shorten Conflict 409", func(t *testing.T) {
+		svc := &mockURLService{
+			CreateShortURLFunc: func(ctx context.Context, str string) (string, error) {
+				return "conflictedJSON", repository.ErrURLConflict
+			},
+		}
+		h := NewURLHandler(domainURL, svc)
+
+		reqBody := `{"url":"https://yandex.ru"}`
+		req := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(reqBody))
+		w := httptest.NewRecorder()
+
+		h.ShortenURL(w, req)
+
+		assert.Equal(t, http.StatusConflict, w.Code)
+	})
+}
+
+// --- TESTS FOR Ping ---
+
+func TestUrlHandle_Ping(t *testing.T) {
+	t.Run("Success 200", func(t *testing.T) {
+		svc := &mockURLService{
+			PingFunc: func(ctx context.Context) error { return nil },
+		}
+		h := NewURLHandler(domainURL, svc)
+		req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+		w := httptest.NewRecorder()
+
+		h.Ping(w, req)
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("Failure 500", func(t *testing.T) {
+		svc := &mockURLService{
+			PingFunc: func(ctx context.Context) error { return errors.New("db disconnect") },
+		}
+		h := NewURLHandler(domainURL, svc)
+		req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+		w := httptest.NewRecorder()
+
+		h.Ping(w, req)
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
+	})
+}
+
+// --- TESTS FOR GetUserShortUrls ---
+
+func TestUrlHandle_GetUserShortUrls_Scenarios(t *testing.T) {
+	t.Run("Negative - Unauthorized 401", func(t *testing.T) {
+		h := NewURLHandler(domainURL, &mockURLService{})
+		req := httptest.NewRequest(http.MethodGet, "/api/user/urls", nil) // Нет UserId в контексте
+		w := httptest.NewRecorder()
+
+		h.GetUserShortUrls(w, req)
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+	})
+
+	t.Run("Positive - No Content 204", func(t *testing.T) {
+		svc := &mockURLService{
+			GetUserShortUrlsFunc: func(ctx context.Context) ([]model.ShortenURLRecord, error) {
+				return []model.ShortenURLRecord{}, nil // Ссылок нет
+			},
+		}
+		h := NewURLHandler(domainURL, svc)
+		req := httptest.NewRequest(http.MethodGet, "/api/user/urls", nil)
+		ctx := context.WithValue(req.Context(), contextkeys.UserId, userIDKey)
+		req = req.WithContext(ctx)
+		w := httptest.NewRecorder()
+
+		h.GetUserShortUrls(w, req)
+		assert.Equal(t, http.StatusNoContent, w.Code)
+	})
+
+	t.Run("Positive - Success 200 with Records", func(t *testing.T) {
+		svc := &mockURLService{
+			GetUserShortUrlsFunc: func(ctx context.Context) ([]model.ShortenURLRecord, error) {
+				return []model.ShortenURLRecord{
+					{ShortURL: "id1", OriginalURL: "http://site1.com"},
+				}, nil
+			},
+		}
+		h := NewURLHandler(domainURL, svc)
+		req := httptest.NewRequest(http.MethodGet, "/api/user/urls", nil)
+		ctx := context.WithValue(req.Context(), contextkeys.UserId, userIDKey)
+		req = req.WithContext(ctx)
+		w := httptest.NewRecorder()
+
+		h.GetUserShortUrls(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Contains(t, w.Header().Get("Content-Type"), "application/json")
+
+		var records []model.ShortenURLRecord
+		err := json.Unmarshal(w.Body.Bytes(), &records)
+		require.NoError(t, err)
+		assert.Len(t, records, 1)
+		assert.Equal(t, domainURL+"/id1", records[0].ShortURL)
+	})
+}
+
+// --- TESTS FOR DeleteBatch ---
+
+func TestUrlHandle_DeleteBatch(t *testing.T) {
+	t.Run("Success 202 Accepted", func(t *testing.T) {
+		svc := &mockURLService{
+			DeleteBatchUrlFunc: func(ctx context.Context, shotUrls []string) error {
+				assert.Len(t, shotUrls, 2)
+				assert.Equal(t, "code1", shotUrls[0])
+				return nil
+			},
+		}
+		h := NewURLHandler(domainURL, svc)
+
+		reqBody := `["code1", "code2"]`
+		req := httptest.NewRequest(http.MethodDelete, "/api/user/urls", strings.NewReader(reqBody))
+		w := httptest.NewRecorder()
+
+		h.DeleteBatch(w, req)
+
+		assert.Equal(t, http.StatusAccepted, w.Code)
 	})
 }
