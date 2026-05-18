@@ -22,7 +22,7 @@ func GetConfig() *Config {
 	flag.StringVar(&config.ServerAddress, "a", "localhost:8080", "server address")
 	flag.StringVar(&config.BaseURLAddress, "b", "http://localhost:8080", "base shorted URL")
 	flag.StringVar(&config.LoggerLevel, "l", "info", "log level")
-	flag.StringVar(&config.FileStoragePath, "f", "/storage.json", "path to storage file")
+	flag.StringVar(&config.FileStoragePath, "f", "storage.json", "path to storage file")
 	flag.StringVar(&config.DatabaseDSN, "d", "", "postgress url")
 	flag.StringVar(&config.AuditFile, "audit-file", "", "path to audit log file")
 	flag.StringVar(&config.AuditURL, "audit-url", "", "remote audit server url")

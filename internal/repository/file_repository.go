@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"sync"
@@ -12,30 +13,37 @@ import (
 )
 
 type FileRepository struct {
-	mutex           sync.RWMutex
-	fileStoragePath string
-	store           map[string]model.ShortenURLRecord
+	mutex   sync.RWMutex
+	file    *os.File
+	encoder *json.Encoder
+	store   map[string]model.ShortenURLRecord
 }
 
-func NewFileRepository(filePath string) *FileRepository {
-	fr := FileRepository{fileStoragePath: filePath, store: make(map[string]model.ShortenURLRecord)}
+func NewFileRepository(filePath string) (*FileRepository, error) {
+	file, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+
+	if err != nil {
+		return nil, fmt.Errorf("NewFileRepository: %w", err)
+	}
+
+	encoder := json.NewEncoder(file)
+
+	fr := FileRepository{
+		file:    file,
+		encoder: encoder,
+		store:   make(map[string]model.ShortenURLRecord, 1000),
+	}
+
 	fr.fillCasheStorage()
-	return &fr
+
+	return &fr, nil
 }
 
 func (r *FileRepository) Save(_ context.Context, record model.ShortenURLRecord) (model.ShortenURLRecord, error) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	file, err := os.OpenFile(r.fileStoragePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
-
-	if err != nil {
-		return model.ShortenURLRecord{}, err
-	}
-
-	defer file.Close()
-
-	if err := json.NewEncoder(file).Encode(record); err != nil {
+	if err := r.encoder.Encode(record); err != nil {
 		return model.ShortenURLRecord{}, err
 	}
 
@@ -54,15 +62,7 @@ func (r *FileRepository) FindByCode(_ context.Context, code string) (model.Short
 }
 
 func (r *FileRepository) fillCasheStorage() error {
-	file, err := os.OpenFile(r.fileStoragePath, os.O_CREATE|os.O_RDWR, 0644)
-
-	if err != nil {
-		return err
-	}
-
-	defer file.Close()
-
-	decoder := json.NewDecoder(file)
+	decoder := json.NewDecoder(r.file)
 
 	for {
 		var record model.ShortenURLRecord
@@ -84,20 +84,10 @@ func (r *FileRepository) Ping(_ context.Context) error {
 
 func (r *FileRepository) Batch(ctx context.Context, shortenURLRecords []model.ShortenURLRecord) error {
 	r.mutex.Lock()
-
-	file, err := os.OpenFile(r.fileStoragePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
-
-	if err != nil {
-		return err
-	}
-
-	defer file.Close()
 	defer r.mutex.Unlock()
 
-	encoder := json.NewEncoder(file)
-
 	for _, url := range shortenURLRecords {
-		if err := encoder.Encode(url); err != nil {
+		if err := r.encoder.Encode(url); err != nil {
 			return err
 		}
 	}
@@ -113,28 +103,9 @@ func (r *FileRepository) GetURLsByUserID(ctx context.Context, userID string) ([]
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 
-	file, err := os.Open(r.fileStoragePath)
-	if err != nil {
-		return nil, err
-	}
-
-	defer file.Close()
-
-	decoder := json.NewDecoder(file)
-
 	var userRecords []model.ShortenURLRecord
 
-	for {
-		var record model.ShortenURLRecord
-
-		err := decoder.Decode(&record)
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			}
-			return nil, err
-		}
-
+	for _, record := range r.store {
 		if record.UserUUID == userID {
 			userRecords = append(userRecords, record)
 		}

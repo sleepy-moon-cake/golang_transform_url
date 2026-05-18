@@ -1,5 +1,9 @@
 DATABASE_DSN=postgres://myuser:mypass@localhost:5432/mydb?sslmode=disable
 
+
+dev:
+	go run cmd/shortener/main.go
+
 run:
 	DATABASE_DSN="$(DATABASE_DSN)" go run cmd/shortener/main.go
 

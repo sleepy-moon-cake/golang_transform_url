@@ -17,9 +17,9 @@ type Repository interface {
 	DeleteBatch(ctx context.Context, urls []model.ShortenUrlDeleteRecord) error
 }
 
-func NewRepository(filePath string, db *db.DBSQL) Repository {
+func NewRepository(filePath string, db *db.DBSQL) (Repository, error) {
 	if db != nil {
-		return NewSQLRepository(db.DB)
+		return NewSQLRepository(db.DB), nil
 	}
 
 	return NewFileRepository(filePath)

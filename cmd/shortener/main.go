@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"log/slog"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"time"
 
@@ -49,7 +51,11 @@ func main() {
 }
 
 func listenAndServe(ctx context.Context, cng *config.Config, db *db.DBSQL) error {
-	repository := repository.NewRepository(cng.FileStoragePath, db)
+	repository, err := repository.NewRepository(cng.FileStoragePath, db)
+	if err != nil {
+		return fmt.Errorf("repository init failed: %w", err)
+	}
+
 	service := service.NewService(repository)
 	handler := handler.NewURLHandler(cng.BaseURLAddress, service)
 
@@ -85,6 +91,8 @@ func createRouter(ctx context.Context, cfg *config.Config, handler *handler.URLH
 	r.Get("/api/user/urls", handler.GetUserShortUrls)
 
 	r.Delete("/api/user/urls", handler.DeleteBatch)
+
+	r.Mount("/debug", http.DefaultServeMux)
 
 	return r
 }
