@@ -1,10 +1,10 @@
 package main
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -16,16 +16,13 @@ import (
 
 // Тест проверяет успешное создание короткого URL через POST-запрос к API
 func TestCreateShortURL_Success(t *testing.T) {
-	tmpFile, err := os.CreateTemp("", "test_storage_*.json")
-	if err != nil {
-		t.Fatalf("failed to create temp file: %v", err)
-	}
-	defer os.Remove(tmpFile.Name())
+	dir := t.TempDir()
+	tmpFile := filepath.Join(dir, "test_storage.json")
 
 	cfg := &config.Config{
 		ServerAddress:   "localhost:8080",
 		BaseURLAddress:  "http://localhost:8080",
-		FileStoragePath: tmpFile.Name(),
+		FileStoragePath: tmpFile,
 	}
 
 	repo, err := repository.NewRepository(cfg.FileStoragePath, nil)
@@ -34,7 +31,11 @@ func TestCreateShortURL_Success(t *testing.T) {
 	}
 	svc := service.NewService(repo)
 	h := handler.NewURLHandler(cfg.BaseURLAddress, svc)
-	router := createRouter(context.Background(), cfg, h)
+	router, err := createRouter(t.Context(), cfg, h)
+
+	if err != nil {
+		t.Fatalf("failed to create router: %v", err)
+	}
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest("POST", "/", strings.NewReader("https://yandex.ru"))
@@ -61,7 +62,11 @@ func TestPing_WithoutDB(t *testing.T) {
 	repo, _ := repository.NewRepository("", nil)
 	svc := service.NewService(repo)
 	h := handler.NewURLHandler(cfg.BaseURLAddress, svc)
-	router := createRouter(context.Background(), cfg, h)
+
+	router, err := createRouter(t.Context(), cfg, h)
+	if err != nil {
+		t.Fatalf("failed to create router: %v", err)
+	}
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest("GET", "/ping", nil)
@@ -94,7 +99,11 @@ func BenchmarkCreateShortURL(b *testing.B) {
 	svc := service.NewService(repo)
 	h := handler.NewURLHandler(cfg.BaseURLAddress, svc)
 
-	router := createRouter(context.Background(), cfg, h)
+	router, err := createRouter(b.Context(), cfg, h)
+
+	if err != nil {
+		b.Fatalf("failed to create router: %v", err)
+	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

@@ -1,6 +1,9 @@
 package audit
 
-import "context"
+import (
+	"context"
+	"log/slog"
+)
 
 type Event struct {
 	Ts     int    `json:"ts"`
@@ -44,6 +47,7 @@ func NewAuditService(ctx context.Context) *AuditService {
 					select {
 					case ch <- e:
 					default:
+						slog.Warn("subscriber channel is full, skipping event", "event", e)
 					}
 				}
 			}

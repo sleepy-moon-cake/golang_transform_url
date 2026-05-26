@@ -2,6 +2,7 @@ package audit
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -13,11 +14,15 @@ type AuditConfig struct {
 	Path string
 }
 
-func NewAuditMiddleware(ctx context.Context, cfg *AuditConfig) func(http.Handler) http.Handler {
+func NewAuditMiddleware(ctx context.Context, cfg *AuditConfig) (func(http.Handler) http.Handler, error) {
 	server := NewAuditService(ctx)
 
 	if cfg.Path != "" {
-		fileStorage := NewFileStorage(cfg.Path)
+		fileStorage, err := NewFileStorage(cfg.Path)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize file storage: %w", err)
+		}
+
 		subFile := NewSubscriber(100)
 		server.Subscribe(subFile)
 
@@ -31,6 +36,7 @@ func NewAuditMiddleware(ctx context.Context, cfg *AuditConfig) func(http.Handler
 
 		go StartWorker(ctx, remoteStorage, subRemote, server)
 	}
+
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			wrapper := ResponseWrapper{ResponseWriter: w}
@@ -56,7 +62,7 @@ func NewAuditMiddleware(ctx context.Context, cfg *AuditConfig) func(http.Handler
 				})
 			}
 		})
-	}
+	}, nil
 }
 
 type ResponseWrapper struct {

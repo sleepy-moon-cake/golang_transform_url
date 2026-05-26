@@ -59,13 +59,21 @@ func listenAndServe(ctx context.Context, cng *config.Config, db *db.DBSQL) error
 	service := service.NewService(repository)
 	handler := handler.NewURLHandler(cng.BaseURLAddress, service)
 
-	router := createRouter(ctx, cng, handler)
+	router, err := createRouter(ctx, cng, handler)
+
+	if err != nil {
+		return err
+	}
 
 	return http.ListenAndServe(cng.ServerAddress, router)
 }
 
-func createRouter(ctx context.Context, cfg *config.Config, handler *handler.URLHandle) http.Handler {
-	auditMW := audit.NewAuditMiddleware(ctx, &audit.AuditConfig{URL: cfg.AuditURL, Path: cfg.AuditFile})
+func createRouter(ctx context.Context, cfg *config.Config, handler *handler.URLHandle) (http.Handler, error) {
+	auditMW, err := audit.NewAuditMiddleware(ctx, &audit.AuditConfig{URL: cfg.AuditURL, Path: cfg.AuditFile})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create audit middleware: %v", err)
+	}
 
 	r := chi.NewRouter()
 	r.Use(session.JWTSession(&session.SessionConfig{
@@ -94,5 +102,5 @@ func createRouter(ctx context.Context, cfg *config.Config, handler *handler.URLH
 
 	r.Mount("/debug", http.DefaultServeMux)
 
-	return r
+	return r, nil
 }

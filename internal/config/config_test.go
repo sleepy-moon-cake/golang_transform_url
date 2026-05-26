@@ -26,10 +26,10 @@ func TestGetConfig_Defaults(t *testing.T) {
 	cfg := GetConfig()
 
 	if cfg.ServerAddress != "localhost:8080" {
-		t.Errorf("expected default ServerAddress 'localhost:8080', got '%s'", cfg.ServerAddress)
+		t.Errorf("expected default ServerAddress 'localhost:8080', got %q", cfg.ServerAddress)
 	}
 	if cfg.FileStoragePath != "storage.json" {
-		t.Errorf("expected default FileStoragePath 'storage.json', got '%s'", cfg.FileStoragePath)
+		t.Errorf("expected default FileStoragePath 'storage.json', got %q", cfg.FileStoragePath)
 	}
 }
 

@@ -12,6 +12,8 @@ import (
 
 // Repository описывает единый интерфейс (контракт) для взаимодействия
 // с хранилищами данных любого типа (база данных или файловая система).
+//
+//go:generate mockgen -source=repository.go -destination=../mocks/repository_mock.go -package=mocks
 type Repository interface {
 	// Ping проверяет доступность и статус подключения к хранилищу.
 	Ping(ctx context.Context) error

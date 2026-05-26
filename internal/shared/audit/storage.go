@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 )
 
@@ -15,23 +16,39 @@ type Storage interface {
 }
 
 type FileStorage struct {
-	filePath string
+	file    *os.File
+	encoder *json.Encoder
+	mu      sync.Mutex
 }
 
-func NewFileStorage(path string) *FileStorage {
-	return &FileStorage{filePath: path}
+func NewFileStorage(path string) (*FileStorage, error) {
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to open file storage: %w", err)
+	}
+
+	encoder := json.NewEncoder(file)
+
+	return &FileStorage{file: file, encoder: encoder}, nil
 }
 
 func (f *FileStorage) Send(_ context.Context, e Event) error {
-	file, err := os.OpenFile(f.filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+	f.mu.Lock()
+	defer f.mu.Unlock()
 
-	if err != nil {
-		return fmt.Errorf("send: %w", err)
-	}
-	defer file.Close()
-
-	if err := json.NewEncoder(file).Encode(&e); err != nil {
+	if err := f.encoder.Encode(&e); err != nil {
 		return fmt.Errorf("send: decode : %w", err)
+	}
+	return nil
+}
+
+func (f *FileStorage) Close() error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	if f.file != nil {
+		return f.file.Close()
 	}
 	return nil
 }
