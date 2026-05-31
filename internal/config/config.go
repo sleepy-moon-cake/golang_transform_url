@@ -12,6 +12,8 @@ type Config struct {
 	LoggerLevel     string
 	FileStoragePath string
 	DatabaseDSN     string
+	AuditFile       string
+	AuditURL        string
 }
 
 func GetConfig() *Config {
@@ -20,8 +22,10 @@ func GetConfig() *Config {
 	flag.StringVar(&config.ServerAddress, "a", "localhost:8080", "server address")
 	flag.StringVar(&config.BaseURLAddress, "b", "http://localhost:8080", "base shorted URL")
 	flag.StringVar(&config.LoggerLevel, "l", "info", "log level")
-	flag.StringVar(&config.FileStoragePath, "f", "/storage.json", "path to storage file")
+	flag.StringVar(&config.FileStoragePath, "f", "storage.json", "path to storage file")
 	flag.StringVar(&config.DatabaseDSN, "d", "", "postgress url")
+	flag.StringVar(&config.AuditFile, "audit-file", "", "path to audit log file")
+	flag.StringVar(&config.AuditURL, "audit-url", "", "remote audit server url")
 
 	flag.Parse()
 
@@ -43,6 +47,14 @@ func GetConfig() *Config {
 
 	if databaseDSN, ok := os.LookupEnv("DATABASE_DSN"); ok {
 		config.DatabaseDSN = databaseDSN
+	}
+
+	if auditFile, ok := os.LookupEnv("AUDIT_FILE"); ok {
+		config.AuditFile = auditFile
+	}
+
+	if auditFile, ok := os.LookupEnv("AUDIT_URL"); ok {
+		config.AuditFile = auditFile
 	}
 
 	slog.Info("Configurations:::",

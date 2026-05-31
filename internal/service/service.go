@@ -1,3 +1,5 @@
+// Package service реализует бизнес-логику для управления сокращенными
+// ссылками, включая их генерацию, пакетную обработку и асинхронное удаление.
 package service
 
 import (
@@ -13,13 +15,19 @@ import (
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/shared/contextkeys"
 )
 
+// ErrURLBeenDeleted возвращается, если запрашиваемый короткий код
+// принадлежит ссылке, которая была ранее помечена как удаленная.
 var ErrURLBeenDeleted = errors.New("record was deleted")
 
+// Service координирует работу с репозиторием и инкапсулирует канал
+// для пакетной буферизации задач на асинхронное удаление URL.
 type Service struct {
 	repository        repository.Repository
 	deleteUrlsChannel chan []model.ShortenUrlDeleteRecord
 }
 
+// NewService инициализирует структуру бизнес-логики Service и автоматически
+// запускает в фоновой горутине конкурентный воркер удаления записей.
 func NewService(repository repository.Repository) *Service {
 	instance := &Service{
 		repository:        repository,
@@ -31,6 +39,8 @@ func NewService(repository repository.Repository) *Service {
 	return instance
 }
 
+// CreateShortURL генерирует новый уникальный ключ, извлекает UUID пользователя
+// из контекста и сохраняет сформированную запись в текущий репозиторий.
 func (s *Service) CreateShortURL(ctx context.Context, str string) (string, error) {
 	key, err := generateKey()
 
@@ -59,6 +69,8 @@ func (s *Service) CreateShortURL(ctx context.Context, str string) (string, error
 	return key, nil
 }
 
+// GetURLByCode ищет запись по её короткому коду. Если у записи установлен
+// флаг DeletedFlag, метод возвращает ошибку ErrURLBeenDeleted.
 func (s *Service) GetURLByCode(ctx context.Context, code string) (string, error) {
 	record, err := s.repository.FindByCode(ctx, code)
 
@@ -90,10 +102,13 @@ func generateKey() (string, error) {
 	return string(b), nil
 }
 
+// Ping прокидывает запрос проверки связи на уровень нижележащего репозитория.
 func (s *Service) Ping(ctx context.Context) error {
 	return s.repository.Ping(ctx)
 }
 
+// Batch принимает пакет запросов, генерирует для каждой ссылки короткий ключ
+// и производит массовую атомарную вставку записей через репозиторий.
 func (s *Service) Batch(ctx context.Context, shortURLBatch []model.ShortenURLBatchRequest) ([]model.ShortenURLBatchResponse, error) {
 	shortenURLBatchRequestRecords := make([]model.ShortenURLBatchResponse, 0, len(shortURLBatch))
 	records := make([]model.ShortenURLRecord, 0, len(shortURLBatch))
@@ -131,6 +146,8 @@ func (s *Service) Batch(ctx context.Context, shortURLBatch []model.ShortenURLBat
 	return shortenURLBatchRequestRecords, nil
 }
 
+// GetUserShortUrls извлекает идентификатор пользователя из контекста
+// и запрашивает из репозитория все связанные с ним записи сокращенных URL.
 func (s *Service) GetUserShortUrls(ctx context.Context) ([]model.ShortenURLRecord, error) {
 	value, ok := ctx.Value(contextkeys.UserId).(string)
 
@@ -141,6 +158,8 @@ func (s *Service) GetUserShortUrls(ctx context.Context) ([]model.ShortenURLRecor
 	return s.repository.GetURLsByUserID(ctx, value)
 }
 
+// DeleteBatchUrl упаковывает слайс коротких ссылок в структуры для удаления,
+// привязывает к ним UUID пользователя и отправляет в буферизированный канал воркера.
 func (s *Service) DeleteBatchUrl(ctx context.Context, shotUrls []string) error {
 	userUUID, ok := ctx.Value(contextkeys.UserId).(string)
 
