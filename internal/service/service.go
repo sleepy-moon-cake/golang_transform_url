@@ -61,9 +61,9 @@ func (s *Service) CreateShortURL(ctx context.Context, str string) (string, error
 		UserUUID:    value,
 	}
 
-	if record, err := s.repository.Save(ctx, record); err != nil {
+	if savedRecord, err := s.repository.Save(ctx, record); err != nil {
 		slog.Error("Save record")
-		return record.ShortURL, err
+		return savedRecord.ShortURL, err
 	}
 
 	return key, nil

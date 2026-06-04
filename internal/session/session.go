@@ -87,7 +87,7 @@ func parseJWTString(jwtString string, secretKey string) (string, error) {
 	})
 
 	if err != nil {
-		return "", fmt.Errorf("%w: %v", ErrParseToken, err)
+		return "", errors.Join(ErrParseToken, err)
 	}
 
 	if !token.Valid {

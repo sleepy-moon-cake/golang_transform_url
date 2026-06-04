@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net/http"
 	_ "net/http/pprof"
-	"os"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -37,7 +36,8 @@ func main() {
 
 		if err != nil {
 			slog.Error("Database err", slog.String("err", err.Error()))
-			os.Exit(1)
+
+			log.Fatalf("Database err: %v", err)
 		}
 
 		database = dbSQL
@@ -72,7 +72,7 @@ func createRouter(ctx context.Context, cfg *config.Config, handler *handler.URLH
 	auditMW, err := audit.NewAuditMiddleware(ctx, &audit.AuditConfig{URL: cfg.AuditURL, Path: cfg.AuditFile})
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to create audit middleware: %v", err)
+		return nil, fmt.Errorf("failed to create audit middleware: %w", err)
 	}
 
 	r := chi.NewRouter()
