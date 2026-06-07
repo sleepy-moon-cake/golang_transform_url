@@ -22,7 +22,15 @@ import (
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/shared/audit"
 )
 
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
+)
+
 func main() {
+	printBuildInfo()
+
 	cfg := config.GetConfig()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -103,4 +111,25 @@ func createRouter(ctx context.Context, cfg *config.Config, handler *handler.URLH
 	r.Mount("/debug", http.DefaultServeMux)
 
 	return r, nil
+}
+
+func printBuildInfo() {
+	version := "N/A"
+	if buildVersion != "" {
+		version = buildVersion
+	}
+
+	date := "N/A"
+	if buildDate != "" {
+		date = buildDate
+	}
+
+	commit := "N/A"
+	if buildCommit != "" {
+		commit = buildCommit
+	}
+
+	fmt.Printf("Build version: %s\n", version)
+	fmt.Printf("Build date: %s\n", date)
+	fmt.Printf("Build commit: %s\n", commit)
 }
