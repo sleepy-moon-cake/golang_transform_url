@@ -4,6 +4,7 @@ import (
 	"flag"
 	"log/slog"
 	"os"
+	"strconv"
 )
 
 type Config struct {
@@ -14,6 +15,7 @@ type Config struct {
 	DatabaseDSN     string
 	AuditFile       string
 	AuditURL        string
+	Secure          bool
 }
 
 func GetConfig() *Config {
@@ -26,6 +28,7 @@ func GetConfig() *Config {
 	flag.StringVar(&config.DatabaseDSN, "d", "", "postgress url")
 	flag.StringVar(&config.AuditFile, "audit-file", "", "path to audit log file")
 	flag.StringVar(&config.AuditURL, "audit-url", "", "remote audit server url")
+	flag.BoolVar(&config.Secure, "s", false, "use https")
 
 	flag.Parse()
 
@@ -55,6 +58,14 @@ func GetConfig() *Config {
 
 	if auditFile, ok := os.LookupEnv("AUDIT_URL"); ok {
 		config.AuditFile = auditFile
+	}
+
+	if secure, ok := os.LookupEnv("ENABLE_HTTPS"); ok {
+		if value, err := strconv.ParseBool(secure); err == nil {
+			config.Secure = value
+		} else {
+			slog.Error("Cant parse ENABLE_HTTPS env", "ENABLE_HTTPS", secure)
+		}
 	}
 
 	slog.Info("Configurations:::",

@@ -53,13 +53,14 @@ func main() {
 
 	logger.Init(cfg.LoggerLevel)
 
-	if err := listenAndServe(ctx, cfg, database); err != nil {
+	if err := run(ctx, cfg, database); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func listenAndServe(ctx context.Context, cng *config.Config, db *db.DBSQL) error {
+func run(ctx context.Context, cng *config.Config, db *db.DBSQL) error {
 	repository, err := repository.NewRepository(cng.FileStoragePath, db)
+
 	if err != nil {
 		return fmt.Errorf("repository init failed: %w", err)
 	}
@@ -73,7 +74,20 @@ func listenAndServe(ctx context.Context, cng *config.Config, db *db.DBSQL) error
 		return err
 	}
 
-	return http.ListenAndServe(cng.ServerAddress, router)
+	srv := &http.Server{
+		Addr:         cng.ServerAddress,
+		Handler:      router,
+		ReadTimeout:  5 * time.Second,   // время на чтение запроса
+		WriteTimeout: 10 * time.Second,  // время на отправку ответа
+		IdleTimeout:  120 * time.Second, // время удержания соединения (Keep-Alive)
+	}
+
+	if cng.Secure {
+		slog.Info("Start listen server in secure mode")
+		return srv.ListenAndServeTLS("cert.pem", "key.pem")
+	}
+	slog.Info("Start listen server")
+	return srv.ListenAndServe()
 }
 
 func createRouter(ctx context.Context, cfg *config.Config, handler *handler.URLHandle) (http.Handler, error) {
