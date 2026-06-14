@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"net/http"
 	_ "net/http/pprof"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -33,7 +35,7 @@ func main() {
 
 	cfg := config.GetConfig()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT|syscall.SIGTERM|syscall.SIGKILL)
 
 	defer cancel()
 
@@ -82,12 +84,33 @@ func run(ctx context.Context, cng *config.Config, db *db.DBSQL) error {
 		IdleTimeout:  120 * time.Second, // время удержания соединения (Keep-Alive)
 	}
 
-	if cng.Secure {
-		slog.Info("Start listen server in secure mode")
-		return srv.ListenAndServeTLS("cert.pem", "key.pem")
+	go func() {
+		if cng.Secure {
+			slog.Info("Start listen server in secure mode")
+
+			if err := srv.ListenAndServeTLS("cert.pem", "key.pem"); err != nil && err != http.ErrServerClosed {
+				slog.Error("server failed", "error", err)
+			}
+
+		} else {
+			slog.Info("Start listen server")
+
+			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				slog.Error("server failed", "error", err)
+			}
+		}
+	}()
+
+	<-ctx.Done()
+
+	ctxWithTime, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
+	if err := srv.Shutdown(ctxWithTime); err != nil {
+		srv.Close()
+		return fmt.Errorf("server forced to shutdown: %w", err)
 	}
-	slog.Info("Start listen server")
-	return srv.ListenAndServe()
+	return nil
 }
 
 func createRouter(ctx context.Context, cfg *config.Config, handler *handler.URLHandle) (http.Handler, error) {
