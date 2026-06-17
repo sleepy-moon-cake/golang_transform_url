@@ -6,6 +6,7 @@ import (
 	"go/ast"
 	"go/format"
 	"go/token"
+	"go/types"
 	"log"
 	"os"
 	"path/filepath"
@@ -14,27 +15,35 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-// StructInfo собирает метаданные структуры для генерации метода Reset
+// StructInfo хранит проверенную информацию о типах от go/types
 type StructInfo struct {
 	Name   string
-	Fields []*ast.Field
+	Fields []FieldInfo
+}
+
+type FieldInfo struct {
+	Name string
+	Type types.Type
 }
 
 func main() {
-	// 1. Настройка конфигурации для рекурсивного сканирования всего проекта
+	// 1. Включаем NeedTypes и NeedTypesInfo.
 	cfg := &packages.Config{
-		Mode: packages.NeedSyntax | packages.NeedName | packages.NeedFiles,
+		Mode: packages.NeedSyntax | packages.NeedName | packages.NeedFiles | packages.NeedTypes | packages.NeedTypesInfo,
 		Fset: token.NewFileSet(),
 	}
 
-	// Любое имя пакета "./..." заставит Go рекурсивно пройти от текущей папки и ниже
+	// Загружаем проект
 	pkgs, err := packages.Load(cfg, "./...")
 	if err != nil {
 		log.Fatalf("Ошибка загрузки пакетов: %v", err)
 	}
 
-	// 2. Итерируемся по всем найденным пакетам проекта
+	// 2. Итерируемся по пакетам
 	for _, pkg := range pkgs {
+		if len(pkg.Errors) > 0 {
+			log.Printf("Предупреждение: ошибки в пакете %s: %v", pkg.Name, pkg.Errors)
+		}
 		if len(pkg.Syntax) == 0 {
 			continue
 		}
@@ -72,17 +81,47 @@ func main() {
 					return true
 				}
 
-				// Проверяем комментарий Doc над блоком объявления типа
 				if genDecl.Doc != nil && strings.Contains(genDecl.Doc.Text(), "generate:reset") {
 					for _, spec := range genDecl.Specs {
-						if typeSpec, ok := spec.(*ast.TypeSpec); ok {
-							if structType, ok := typeSpec.Type.(*ast.StructType); ok {
-								targetStructs = append(targetStructs, StructInfo{
-									Name:   typeSpec.Name.Name,
-									Fields: structType.Fields.List,
-								})
-							}
+						typeSpec, ok := spec.(*ast.TypeSpec)
+						if !ok {
+							continue
 						}
+
+						obj := pkg.TypesInfo.Defs[typeSpec.Name]
+						if obj == nil {
+							continue
+						}
+
+						// Проверяем, что это именно Named тип (имеющий имя)
+						named, ok := obj.Type().(*types.Named)
+						if !ok {
+							continue
+						}
+
+						// Достаем структуру, которая скрывается под этим именем
+						structType, ok := named.Underlying().(*types.Struct)
+						if !ok {
+							continue
+						}
+
+						// Собираем поля, используя строго типизированный API компилятора
+						var fields []FieldInfo
+						for j := 0; j < structType.NumFields(); j++ {
+							field := structType.Field(j)
+
+							// Пропускаем встроенные (embedded) безымянные поля, если это необходимо,
+							// либо берем их имя типа как имя поля.
+							fields = append(fields, FieldInfo{
+								Name: field.Name(),
+								Type: field.Type(),
+							})
+						}
+
+						targetStructs = append(targetStructs, StructInfo{
+							Name:   typeSpec.Name.Name,
+							Fields: fields,
+						})
 					}
 				}
 				return true
@@ -100,7 +139,6 @@ func main() {
 	}
 }
 
-// generateResetFile формирует текст файла reset.gen.go, форматирует его и записывает на диск
 func generateResetFile(packageName, outputDir string, structs []StructInfo) error {
 	var buf bytes.Buffer
 
@@ -113,10 +151,7 @@ func generateResetFile(packageName, outputDir string, structs []StructInfo) erro
 		buf.WriteString(fmt.Sprintf("func (r *%s) Reset() {\n", st.Name))
 
 		for _, field := range st.Fields {
-			for _, fieldName := range field.Names {
-				name := fieldName.Name
-				genFieldReset(&buf, name, field.Type)
-			}
+			genFieldReset(&buf, field.Name, field.Type)
 		}
 
 		buf.WriteString("}\n\n")
@@ -125,6 +160,8 @@ func generateResetFile(packageName, outputDir string, structs []StructInfo) erro
 	// Форматируем код через go/format (чтобы расставить отступы и табы)
 	formattedCode, err := format.Source(buf.Bytes())
 	if err != nil {
+		// Для отладки полезно вывести сырой код, если форматирование упало
+		os.WriteFile(filepath.Join(outputDir, "reset.error.go"), buf.Bytes(), 0644)
 		return fmt.Errorf("ошибка форматирования кода: %w", err)
 	}
 
@@ -133,86 +170,72 @@ func generateResetFile(packageName, outputDir string, structs []StructInfo) erro
 	return os.WriteFile(outputPath, formattedCode, 0644)
 }
 
-// genFieldReset анализирует тип поля и пишет соответствующую логику сброса в буфер
-func genFieldReset(buf *bytes.Buffer, name string, expr ast.Expr) {
-	switch t := expr.(type) {
+// genFieldReset анализирует реальный тип (Underlying) и генерирует код сброса
+func genFieldReset(buf *bytes.Buffer, name string, t types.Type) {
+	// Получаем базовый тип (раскрывает кастомные типы вроде type MyInt int -> int)
+	underlying := t.Underlying()
 
-	case *ast.Ident: // Примитивные типы (int, string, bool, etc.)
-		switch t.Name {
-		case "string":
+	switch ut := underlying.(type) {
+
+	case *types.Basic: // Примитивные типы (включая кастомные типы на их основе)
+		info := ut.Info()
+		if info&types.IsString != 0 {
 			buf.WriteString(fmt.Sprintf("\tr.%s = \"\"\n", name))
-		case "bool":
+		} else if info&types.IsBoolean != 0 {
 			buf.WriteString(fmt.Sprintf("\tr.%s = false\n", name))
-		case "int", "int8", "int16", "int32", "int64",
-			"uint", "uint8", "uint16", "uint32", "uint64", "uintptr", "rune", "byte":
-			buf.WriteString(fmt.Sprintf("\tr.%s = 0\n", name))
-		case "float32", "float64":
+		} else if info&types.IsFloat != 0 {
 			buf.WriteString(fmt.Sprintf("\tr.%s = 0.0\n", name))
-		default:
-			// Вложенная структура без указателя (например, field MyStruct)
-			// Вызываем метод Reset(), если он у нее предполагается по условию задания
-			buf.WriteString(fmt.Sprintf("\tr.%s.Reset()\n", name))
+		} else if info&types.IsInteger != 0 {
+			buf.WriteString(fmt.Sprintf("\tr.%s = 0\n", name))
 		}
 
-	case *ast.ArrayType: // Слайсы (массивы фиксированной длины t.Len == nil проверяются так же)
-		if t.Len == nil {
-			// Слайс: обрезаем длину до 0 по условию задания (с сохранением капа)
-			buf.WriteString(fmt.Sprintf("\tr.%s = r.%s[:0]\n", name, name))
-		} else {
-			// Массив фиксированной длины [4]int — зануляем через пустой литерал типа
-			// (опционально, в условии просили только слайсы, но полезно для стабильности)
-			buf.WriteString(fmt.Sprintf("\tr.%s = %s{}\n", name, name))
-		}
+	case *types.Slice: // Слайсы (даже если это кастомный тип вроде type MySlice []int)
+		// Срезаем длину до 0 с сохранением капа (r.Field = r.Field[:0])
+		buf.WriteString(fmt.Sprintf("\tr.%s = r.%s[:0]\n", name, name))
 
-	case *ast.MapType: // Мапы
-		// Очищаем через встроенную функцию clear() (доступна с Go 1.21)
+	case *types.Map: // Мапы
+		// Очищаем через clear(r.Field)
 		buf.WriteString(fmt.Sprintf("\tclear(r.%s)\n", name))
 
-	case *ast.StarExpr: // Указатели (*int, *MyStruct, etc.)
+	case *types.Pointer: // Указатели (*int, *Struct, etc.)
 		buf.WriteString(fmt.Sprintf("\tif r.%s != nil {\n", name))
-		// Проверяем, на что указывает этот указатель
-		switch pType := t.X.(type) {
-		case *ast.Ident:
-			if isPrimitive(pType.Name) {
-				// Если указатель на примитив, сбрасываем значение под ним к дефолту
-				buf.WriteString(fmt.Sprintf("\t\t*r.%s = %s\n", name, getPrimitiveDefault(pType.Name)))
-			} else {
-				// Если указатель на структуру, вызываем её метод Reset()
-				buf.WriteString(fmt.Sprintf("\t\tr.%s.Reset()\n", name))
+
+		// Смотрим, на что указывает указатель (его базовый тип)
+		elemUnderlying := ut.Elem().Underlying()
+
+		switch et := elemUnderlying.(type) {
+		case *types.Basic:
+			// Если указатель на примитив, безопасно зануляем значение под ним
+			info := et.Info()
+			if info&types.IsString != 0 {
+				buf.WriteString(fmt.Sprintf("\t\t*r.%s = \"\"\n", name))
+			} else if info&types.IsBoolean != 0 {
+				buf.WriteString(fmt.Sprintf("\t\t*r.%s = false\n", name))
+			} else if info&types.IsFloat != 0 {
+				buf.WriteString(fmt.Sprintf("\t\t*r.%s = 0.0\n", name))
+			} else if info&types.IsInteger != 0 {
+				buf.WriteString(fmt.Sprintf("\t\t*r.%s = 0\n", name))
 			}
+		case *types.Struct:
+			// Если указатель на структуру, вызываем её метод Reset()
+			buf.WriteString(fmt.Sprintf("\t\tr.%s.Reset()\n", name))
 		default:
-			// Для сложных указателей (указатель на мапу/слайс) рекурсивно вызываем логику
-			// Но пишем без префикса "r.", так как мы уже внутри разыменования/проверки
-			buf.WriteString(fmt.Sprintf("\t\t// Сложный указатель\n"))
+			// На случай указателей на сложные типы (указатель на мапу/слайс)
+			buf.WriteString(fmt.Sprintf("\t\t// Сложный тип под указателем\n"))
 		}
 		buf.WriteString("\t}\n")
 
-	case *ast.SelectorExpr: // Типы из других пакетов (например, time.Time)
-		// Для внешних структур вызываем Reset(), если она им обладает
-		buf.WriteString(fmt.Sprintf("\tr.%s.Reset()\n", name))
-	}
-}
+	case *types.Struct: // Вложенная структура без указателя
+		// Если структура имеет имя (не анонимная), у неё вызывается её собственный Reset
+		if _, ok := t.(*types.Named); ok {
+			buf.WriteString(fmt.Sprintf("\tr.%s.Reset()\n", name))
+		} else {
+			// Для анонимных структур (например, Field struct{A int}) зануляем литералом
+			buf.WriteString(fmt.Sprintf("\tr.%s = %s{}\n", name, t.String()))
+		}
 
-// Вспомогательная функция для проверки примитивов
-func isPrimitive(name string) bool {
-	switch name {
-	case "string", "bool", "int", "int8", "int16", "int32", "int64",
-		"uint", "uint8", "uint16", "uint32", "uint64", "float32", "float64", "byte", "rune":
-		return true
-	}
-	return false
-}
-
-// Вспомогательная функция для получения нулевого значения в виде строки
-func getPrimitiveDefault(name string) string {
-	switch name {
-	case "string":
-		return `""`
-	case "bool":
-		return "false"
-	case "float32", "float64":
-		return "0.0"
-	default:
-		return "0"
+	case *types.Interface: // Интерфейсы (например, interface{} или any)
+		// Интерфейсы сбрасываются в nil
+		buf.WriteString(fmt.Sprintf("\tr.%s = nil\n", name))
 	}
 }

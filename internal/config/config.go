@@ -21,6 +21,19 @@ type Config struct {
 	ConfigFilePath  string `json:"-"`
 }
 
+// goverter:converter
+// goverter:update:ignoreZeroValueField
+// goverter:output:file ./generated.go
+type ConfigMerger interface {
+	// goverter:update target
+	Update(source *Config, target *Config)
+}
+
+func Update(cfg *Config, cfgF *Config) {
+	merger := &ConfigMergerImpl{}
+	merger.Update(cfg, cfgF)
+}
+
 func GetConfig() *Config {
 	var config Config
 
@@ -81,7 +94,14 @@ func GetConfig() *Config {
 		if err != nil {
 			slog.Error("FileConfig", "error", err)
 		} else {
-			mergeConfigs(&config, fileConfigs)
+			Update(&config, fileConfigs)
+
+			slog.Info("Configurations:::",
+				slog.String("Server address", config.ServerAddress),
+				slog.String("Base short URL", config.BaseURLAddress),
+				slog.String("Log level", config.LoggerLevel),
+			)
+			return fileConfigs
 		}
 	}
 
