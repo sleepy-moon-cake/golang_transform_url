@@ -27,6 +27,8 @@ type Repository interface {
 	GetURLsByUserID(ctx context.Context, userID string) ([]model.ShortenURLRecord, error)
 	// DeleteBatch выполняет массовое каскадное обновление флага удаления для списка ссылок.
 	DeleteBatch(ctx context.Context, urls []model.ShortenUrlDeleteRecord) error
+	// GetStats сбор статистики
+	GetStats(ctx context.Context) (model.URLStats, error)
 }
 
 // NewRepository является фабричной функцией, которая инициализирует репозиторий.

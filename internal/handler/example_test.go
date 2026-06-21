@@ -44,6 +44,10 @@ func (m *exampleMockService) DeleteBatchUrl(ctx context.Context, shotUrls []stri
 	return nil
 }
 
+func (e *exampleMockService) GetStats(ctx context.Context) (model.URLStats, error) {
+	return model.URLStats{Urls: 1, Users: 1}, nil
+}
+
 // ExampleURLHandle_CreateShortURL демонстрирует практический пример работы
 // эндпоинта POST /, принимающего оригинальный URL в формате обычного текста.
 func ExampleURLHandle_CreateShortURL() {

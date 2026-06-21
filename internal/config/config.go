@@ -19,6 +19,7 @@ type Config struct {
 	AuditURL        string `json:"audit_url"`
 	Secure          bool   `json:"enable_https"`
 	ConfigFilePath  string `json:"-"`
+	TrustedSubnet   string `json:"trusted_subnet"`
 }
 
 // goverter:converter
@@ -46,6 +47,7 @@ func GetConfig() *Config {
 	flag.StringVar(&config.AuditURL, "audit-url", "", "remote audit server url")
 	flag.BoolVar(&config.Secure, "s", false, "use https")
 	flag.StringVar(&config.ConfigFilePath, "c", "", "configuration file path")
+	flag.StringVar(&config.TrustedSubnet, "t", "", "trasted subnet")
 
 	flag.Parse()
 
@@ -89,6 +91,10 @@ func GetConfig() *Config {
 		config.ConfigFilePath = configPath
 	}
 
+	if trastedSubnet, ok := os.LookupEnv("TRUSTED_SUBNET"); ok {
+		config.TrustedSubnet = trastedSubnet
+	}
+
 	if config.ConfigFilePath != "" {
 		fileConfigs, err := getFileConfigs(config.ConfigFilePath)
 		if err != nil {
@@ -129,32 +135,4 @@ func getFileConfigs(path string) (*Config, error) {
 	}
 
 	return &fileConfigs, nil
-}
-
-// перенести в генератор
-func mergeConfigs(scfg *Config, fcfg *Config) {
-	if scfg.ServerAddress == "" {
-		scfg.ServerAddress = fcfg.ServerAddress
-	}
-	if scfg.BaseURLAddress == "" {
-		scfg.BaseURLAddress = fcfg.BaseURLAddress
-	}
-	if scfg.LoggerLevel == "" {
-		scfg.LoggerLevel = fcfg.LoggerLevel
-	}
-	if scfg.FileStoragePath == "" {
-		scfg.FileStoragePath = fcfg.FileStoragePath
-	}
-	if scfg.DatabaseDSN == "" {
-		scfg.DatabaseDSN = fcfg.DatabaseDSN
-	}
-	if scfg.AuditFile == "" {
-		scfg.AuditFile = fcfg.AuditFile
-	}
-	if scfg.AuditURL == "" {
-		scfg.AuditURL = fcfg.AuditURL
-	}
-	if !scfg.Secure {
-		scfg.Secure = fcfg.Secure
-	}
 }

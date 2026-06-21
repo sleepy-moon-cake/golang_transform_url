@@ -26,6 +26,8 @@ type URLHandle struct {
 	service URLService
 }
 
+//go:generate mockgen -source=handler.go -destination=../mocks/service_mock.go -package=mocks
+
 // URLService описывает контракт для работы с бизнес-логикой сокращения,
 // хранения, пакетной обработки, удаления и извлечения URL-адресов.
 type URLService interface {
@@ -41,6 +43,8 @@ type URLService interface {
 	GetUserShortUrls(ctx context.Context) ([]model.ShortenURLRecord, error)
 	// DeleteBatchUrl ставит в очередь асинхронного воркера пакет кодов на удаление.
 	DeleteBatchUrl(ctx context.Context, shotUrls []string) error
+	// GetStats возращает статистику
+	GetStats(context.Context) (model.URLStats, error)
 }
 
 // NewURLHandler выполняет инициализацию и возвращает новый указатель на структуру URLHandle.
@@ -266,4 +270,19 @@ func (h *URLHandle) DeleteBatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusAccepted)
+}
+
+func (h *URLHandle) GetStats(w http.ResponseWriter, r *http.Request) {
+	stats, err := h.service.GetStats(r.Context())
+
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	if err := json.NewEncoder(w).Encode(stats); err != nil {
+		slog.Error("GetStats", slog.String("error", err.Error()))
+	}
 }

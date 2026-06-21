@@ -22,6 +22,7 @@ import (
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/service"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/session"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/shared/audit"
+	"github.com/sleepy-moon-cake/golang_transform_url/internal/subnet"
 )
 
 var (
@@ -115,6 +116,7 @@ func run(ctx context.Context, cng *config.Config, db *db.DBSQL) error {
 
 func createRouter(ctx context.Context, cfg *config.Config, handler *handler.URLHandle) (http.Handler, error) {
 	auditMW, err := audit.NewAuditMiddleware(ctx, &audit.AuditConfig{URL: cfg.AuditURL, Path: cfg.AuditFile})
+	subnetMW := subnet.NewTrustedSubnetMiddleware(cfg.TrustedSubnet)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create audit middleware: %w", err)
@@ -138,6 +140,8 @@ func createRouter(ctx context.Context, cfg *config.Config, handler *handler.URLH
 		r.With(auditMW).Post("/shorten", handler.ShortenURL)
 		r.Post("/shorten/batch", handler.Batch)
 	})
+
+	r.With(subnetMW).Get("/api/internal/stats", handler.GetStats)
 
 	r.Get("/ping", handler.Ping)
 

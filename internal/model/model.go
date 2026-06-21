@@ -29,3 +29,8 @@ type ShortenURLBatchResponse struct {
 	CorrelationID string `json:"correlation_id"`
 	ShortURL      string `json:"short_url"`
 }
+
+type URLStats struct {
+	Urls  int `json:"urls"`
+	Users int `json:"users"`
+}

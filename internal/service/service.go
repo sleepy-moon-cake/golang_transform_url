@@ -233,3 +233,9 @@ func (s *Service) newDeleteWorker() {
 		}
 	}
 }
+
+func (s *Service) GetStats(ctx context.Context) (model.URLStats, error) {
+	stats, err := s.repository.GetStats(ctx)
+
+	return stats, err
+}
