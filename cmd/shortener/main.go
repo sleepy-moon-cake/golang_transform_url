@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"os/signal"
@@ -13,6 +14,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	appgrpc "github.com/sleepy-moon-cake/golang_transform_url/internal/app/grpc"
+	pb "github.com/sleepy-moon-cake/golang_transform_url/internal/app/grpc/proto"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/compressor"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/config"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/config/db"
@@ -23,6 +26,8 @@ import (
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/session"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/shared/audit"
 	"github.com/sleepy-moon-cake/golang_transform_url/internal/subnet"
+	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc"
 )
 
 var (
@@ -85,12 +90,16 @@ func run(ctx context.Context, cng *config.Config, db *db.DBSQL) error {
 		IdleTimeout:  120 * time.Second, // время удержания соединения (Keep-Alive)
 	}
 
-	go func() {
+	g, groupCtx := errgroup.WithContext(ctx)
+
+	// Запуск HTTP сервера внутри errgroup
+	g.Go(func() error {
 		if cng.Secure {
 			slog.Info("Start listen server in secure mode")
 
 			if err := srv.ListenAndServeTLS("cert.pem", "key.pem"); err != nil && err != http.ErrServerClosed {
 				slog.Error("server failed", "error", err)
+				return fmt.Errorf("ListenAndServeTLS:%w", err)
 			}
 
 		} else {
@@ -98,18 +107,51 @@ func run(ctx context.Context, cng *config.Config, db *db.DBSQL) error {
 
 			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 				slog.Error("server failed", "error", err)
+				return fmt.Errorf("ListenAndServe:%w", err)
 			}
 		}
-	}()
+		return nil
+	})
 
-	<-ctx.Done()
+	grpcListener, gsrv, err := GRPCServer(cng, service)
 
-	ctxWithTime, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
+	if err != nil {
+		slog.Error("grpcserver failed", "error", err)
+		return fmt.Errorf("grpcserver:%w", err)
+	}
 
-	if err := srv.Shutdown(ctxWithTime); err != nil {
-		srv.Close()
-		return fmt.Errorf("server forced to shutdown: %w", err)
+	// Запуск gRPC сервера внутри errgroup
+	g.Go(func() error {
+		slog.Info("Start listen gRPC server", "addr", cng.GRPSServerAddress)
+		if err := gsrv.Serve(grpcListener); err != nil && err != grpc.ErrServerStopped {
+			slog.Error("gRPC server failed", "error", err)
+
+			return fmt.Errorf("grpcListener:%w", err)
+		}
+		return nil
+	})
+
+	// Запуск Graceful Shutdown в errgroup
+	g.Go(func() error {
+		<-groupCtx.Done()
+
+		ctxWithTime, cancel := context.WithTimeout(context.Background(), time.Second*5)
+		defer cancel()
+
+		if err := srv.Shutdown(ctxWithTime); err != nil {
+			srv.Close()
+			return fmt.Errorf("server forced to shutdown: %w", err)
+		}
+
+		gsrv.GracefulStop()
+
+		slog.Info("Servers stop")
+		slog.Info("All servers stopped cleanly")
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
+		return fmt.Errorf("application group failed: %w", err)
 	}
 	return nil
 }
@@ -173,4 +215,26 @@ func printBuildInfo() {
 	fmt.Printf("Build version: %s\n", version)
 	fmt.Printf("Build date: %s\n", date)
 	fmt.Printf("Build commit: %s\n", commit)
+}
+
+func GRPCServer(cfg *config.Config, URLService appgrpc.URLService) (net.Listener, *grpc.Server, error) {
+	grpcListen, err := net.Listen("tcp", cfg.GRPSServerAddress)
+	if err != nil {
+		return nil, nil, fmt.Errorf("RunGRPCServer listen: %w", err)
+	}
+
+	sessionCfg := &session.SessionConfig{
+		Name:      "Session",
+		SecretKey: "SecretKey",
+		ExpiresAt: 3 * time.Hour,
+	}
+
+	grpcServer := grpc.NewServer(
+		grpc.UnaryInterceptor(session.GRPCJWTSession(sessionCfg)),
+	)
+
+	shortenerGRPCServer := appgrpc.NewShortenerGRPCServer(URLService)
+	pb.RegisterShortenerServiceServer(grpcServer, shortenerGRPCServer)
+
+	return grpcListen, grpcServer, nil
 }

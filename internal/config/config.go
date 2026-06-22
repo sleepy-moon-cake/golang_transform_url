@@ -10,16 +10,17 @@ import (
 )
 
 type Config struct {
-	ServerAddress   string `json:"server_address"`
-	BaseURLAddress  string `json:"base_url"`
-	LoggerLevel     string `json:"logger_level"`
-	FileStoragePath string `json:"file_storage_path"`
-	DatabaseDSN     string `json:"database_dsn"`
-	AuditFile       string `json:"audit_file"`
-	AuditURL        string `json:"audit_url"`
-	Secure          bool   `json:"enable_https"`
-	ConfigFilePath  string `json:"-"`
-	TrustedSubnet   string `json:"trusted_subnet"`
+	ServerAddress     string `json:"server_address"`
+	GRPSServerAddress string `json:"grpc_server_address"`
+	BaseURLAddress    string `json:"base_url"`
+	LoggerLevel       string `json:"logger_level"`
+	FileStoragePath   string `json:"file_storage_path"`
+	DatabaseDSN       string `json:"database_dsn"`
+	AuditFile         string `json:"audit_file"`
+	AuditURL          string `json:"audit_url"`
+	Secure            bool   `json:"enable_https"`
+	ConfigFilePath    string `json:"-"`
+	TrustedSubnet     string `json:"trusted_subnet"`
 }
 
 // goverter:converter
@@ -48,6 +49,7 @@ func GetConfig() *Config {
 	flag.BoolVar(&config.Secure, "s", false, "use https")
 	flag.StringVar(&config.ConfigFilePath, "c", "", "configuration file path")
 	flag.StringVar(&config.TrustedSubnet, "t", "", "trasted subnet")
+	flag.StringVar(&config.GRPSServerAddress, "g", ":3200", "gRPC server addresst")
 
 	flag.Parse()
 
@@ -93,6 +95,10 @@ func GetConfig() *Config {
 
 	if trastedSubnet, ok := os.LookupEnv("TRUSTED_SUBNET"); ok {
 		config.TrustedSubnet = trastedSubnet
+	}
+
+	if envGRPCAddr := os.Getenv("GRPC_ADDRESS"); envGRPCAddr != "" {
+		config.GRPSServerAddress = envGRPCAddr
 	}
 
 	if config.ConfigFilePath != "" {
