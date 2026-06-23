@@ -122,7 +122,7 @@ func run(ctx context.Context, cng *config.Config, db *db.DBSQL) error {
 
 	// Запуск gRPC сервера внутри errgroup
 	g.Go(func() error {
-		slog.Info("Start listen gRPC server", "addr", cng.GRPSServerAddress)
+		slog.Info("Start listen gRPC server", "addr", cng.GRPCServerAddress)
 		if err := gsrv.Serve(grpcListener); err != nil && err != grpc.ErrServerStopped {
 			slog.Error("gRPC server failed", "error", err)
 
@@ -158,10 +158,14 @@ func run(ctx context.Context, cng *config.Config, db *db.DBSQL) error {
 
 func createRouter(ctx context.Context, cfg *config.Config, handler *handler.URLHandle) (http.Handler, error) {
 	auditMW, err := audit.NewAuditMiddleware(ctx, &audit.AuditConfig{URL: cfg.AuditURL, Path: cfg.AuditFile})
-	subnetMW := subnet.NewTrustedSubnetMiddleware(cfg.TrustedSubnet)
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to create audit middleware: %w", err)
+	}
+
+	subnetMW, err := subnet.NewTrustedSubnetMiddleware(cfg.TrustedSubnet)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create subnet middleware: %w", err)
 	}
 
 	r := chi.NewRouter()
@@ -183,7 +187,13 @@ func createRouter(ctx context.Context, cfg *config.Config, handler *handler.URLH
 		r.Post("/shorten/batch", handler.Batch)
 	})
 
-	r.With(subnetMW).Get("/api/internal/stats", handler.GetStats)
+	if subnetMW == nil {
+		r.Get("/api/internal/stats", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusForbidden)
+		})
+	} else {
+		r.With(subnetMW).Get("/api/internal/stats", handler.GetStats)
+	}
 
 	r.Get("/ping", handler.Ping)
 
@@ -218,7 +228,7 @@ func printBuildInfo() {
 }
 
 func GRPCServer(cfg *config.Config, URLService appgrpc.URLService) (net.Listener, *grpc.Server, error) {
-	grpcListen, err := net.Listen("tcp", cfg.GRPSServerAddress)
+	grpcListen, err := net.Listen("tcp", cfg.GRPCServerAddress)
 	if err != nil {
 		return nil, nil, fmt.Errorf("RunGRPCServer listen: %w", err)
 	}

@@ -65,7 +65,7 @@ func (s *ShortenerGRPCServer) ListUserURLs(ctx context.Context, req *emptypb.Emp
 		return nil, status.Errorf(codes.Internal, "failed to fetch user URLs: %v", err)
 	}
 
-	var pbUrls []*pb.URLData
+	pbUrls := make([]*pb.URLData, 0, len(records))
 	for _, r := range records {
 		pbUrls = append(pbUrls, &pb.URLData{
 			ShortUrl:    r.ShortURL,
