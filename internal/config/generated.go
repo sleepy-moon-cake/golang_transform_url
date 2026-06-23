@@ -10,6 +10,9 @@ func (c *ConfigMergerImpl) Update(source *Config, target *Config) {
 		if source.ServerAddress != "" {
 			target.ServerAddress = source.ServerAddress
 		}
+		if source.GRPCServerAddress != "" {
+			target.GRPCServerAddress = source.GRPCServerAddress
+		}
 		if source.BaseURLAddress != "" {
 			target.BaseURLAddress = source.BaseURLAddress
 		}
@@ -33,6 +36,9 @@ func (c *ConfigMergerImpl) Update(source *Config, target *Config) {
 		}
 		if source.ConfigFilePath != "" {
 			target.ConfigFilePath = source.ConfigFilePath
+		}
+		if source.TrustedSubnet != "" {
+			target.TrustedSubnet = source.TrustedSubnet
 		}
 	}
 }

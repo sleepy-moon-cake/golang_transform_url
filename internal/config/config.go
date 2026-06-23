@@ -23,6 +23,8 @@ type Config struct {
 	TrustedSubnet     string `json:"trusted_subnet"`
 }
 
+//go:generate go run github.com/jmattheis/goverter/cmd/goverter gen ./...
+
 // goverter:converter
 // goverter:update:ignoreZeroValueField
 // goverter:output:file ./generated.go
