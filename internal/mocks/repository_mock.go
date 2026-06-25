@@ -84,6 +84,21 @@ func (mr *MockRepositoryMockRecorder) FindByCode(ctx, code any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByCode", reflect.TypeOf((*MockRepository)(nil).FindByCode), ctx, code)
 }
 
+// GetStats mocks base method.
+func (m *MockRepository) GetStats(ctx context.Context) (model.URLStats, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetStats", ctx)
+	ret0, _ := ret[0].(model.URLStats)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetStats indicates an expected call of GetStats.
+func (mr *MockRepositoryMockRecorder) GetStats(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStats", reflect.TypeOf((*MockRepository)(nil).GetStats), ctx)
+}
+
 // GetURLsByUserID mocks base method.
 func (m *MockRepository) GetURLsByUserID(ctx context.Context, userID string) ([]model.ShortenURLRecord, error) {
 	m.ctrl.T.Helper()

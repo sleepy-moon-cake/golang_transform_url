@@ -61,9 +61,9 @@ func (s *Service) CreateShortURL(ctx context.Context, str string) (string, error
 		UserUUID:    value,
 	}
 
-	if record, err := s.repository.Save(ctx, record); err != nil {
+	if savedRecord, err := s.repository.Save(ctx, record); err != nil {
 		slog.Error("Save record")
-		return record.ShortURL, err
+		return savedRecord.ShortURL, err
 	}
 
 	return key, nil
@@ -232,4 +232,10 @@ func (s *Service) newDeleteWorker() {
 			deleteUrls = deleteUrls[:0]
 		}
 	}
+}
+
+func (s *Service) GetStats(ctx context.Context) (model.URLStats, error) {
+	stats, err := s.repository.GetStats(ctx)
+
+	return stats, err
 }

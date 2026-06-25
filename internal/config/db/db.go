@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/sleepy-moon-cake/golang_transform_url/migrations"
@@ -15,6 +16,9 @@ type DBSQL struct {
 }
 
 func NewSQLDB(ctx context.Context, databaseDSN string) (*DBSQL, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
 	db, err := sql.Open("pgx", databaseDSN)
 
 	if err != nil {

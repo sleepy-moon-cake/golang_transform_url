@@ -171,3 +171,14 @@ func (r *SQLRepository) DeleteBatch(ctx context.Context, urls []model.ShortenUrl
 
 	return nil
 }
+
+func (r *SQLRepository) GetStats(ctx context.Context) (model.URLStats, error) {
+	var stats = model.URLStats{}
+
+	err := r.db.QueryRowContext(ctx, "SELECT COUNT(id) as urls_count,  COUNT(DISTINCT user_id) as users_count from urls").Scan(&stats.Urls, &stats.Users)
+	if err != nil {
+		return stats, fmt.Errorf("database getstats:%w", err)
+	}
+
+	return stats, nil
+}
